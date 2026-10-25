@@ -4,18 +4,18 @@ import 'package:video_player/video_player.dart';
 
 import '../models/story_group_model.dart';
 import '../models/story_item_model.dart';
+import '../overlays/story_overlay.dart';
+import 'story_overlay_renderer.dart';
 
-/// Signature for interaction callbacks (poll vote, quiz answer, etc.).
-typedef OnOverlayInteraction = void Function(
-  String overlayId,
-  Map<String, dynamic> payload,
-);
+export '../overlays/story_overlay.dart'
+    show OnOverlayInteraction;
 
 /// Instagram-class story viewer.
 ///
 /// Ports the useful behaviors from flutter_story_view (per-item duration,
 /// 30s video cap, hold-to-pause, video loading state,
-/// 30%/70% tap zones) on top of FocusGram's group PageView architecture.
+/// 30%/70% tap zones) on top of FocusGram's group PageView architecture,
+/// and renders the kit's interactive overlays above the media.
 class StoryKitViewer extends StatefulWidget {
   final List<StoryGroupModel> groups;
   final int initialGroupIndex;
@@ -224,6 +224,14 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                 fit: StackFit.expand,
                 children: [
                   _buildMedia(_item),
+                  // Interactive overlays ride above media; their taps are
+                  // absorbed inside overlay bounds and fall through to the
+                  // navigation zones elsewhere.
+                  StoryOverlayRenderer(
+                    overlays: _item.overlays,
+                    onOverlayInteraction: widget.onOverlayInteraction,
+                    onOverlayInteractionStarted: () => _setPaused(true),
+                  ),
                 ],
               );
             },
@@ -246,11 +254,10 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                       child: LinearProgressIndicator(
                         minHeight: 3,
                         backgroundColor: Colors.white24,
-                        valueColor:
-                            const AlwaysStoppedAnimation<Color>(Colors.white),
-                        value: active
-                            ? _progress.value
-                            : (completed ? 1.0 : 0.0),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
+                        value: active ? _progress.value : (completed ? 1.0 : 0.0),
                       ),
                     ),
                   ),
