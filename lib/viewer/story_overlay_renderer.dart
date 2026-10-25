@@ -4,14 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../overlays/story_overlay.dart';
 
-/// Signature for interaction callbacks (poll vote, quiz answer, etc.).
-/// Re-declared here so the renderer is self-contained; the viewer re-exports
-/// a single canonical typedef from its own file.
-typedef OnOverlayInteraction = void Function(
-  String overlayId,
-  Map<String, dynamic> payload,
-);
-
 /// Renders a story item's overlays as tappable, interactive widgets
 /// positioned over the media.
 ///
@@ -49,7 +41,7 @@ class StoryOverlayRenderer extends StatelessWidget {
                 top: overlay.normalizedDy * size.height,
                 child: FractionalTranslation(
                   translation: const Offset(-0.5, -0.5),
-                  child: _buildOverlayWidget(context, overlay),
+                  child: _buildOverlayWidget(overlay),
                 ),
               ),
           ],
@@ -58,7 +50,7 @@ class StoryOverlayRenderer extends StatelessWidget {
     );
   }
 
-  Widget _buildOverlayWidget(BuildContext context, StoryOverlay overlay) {
+  Widget _buildOverlayWidget(StoryOverlay overlay) {
     return switch (overlay) {
       PollOverlay poll => _PollWidget(
         poll: poll,
@@ -90,8 +82,21 @@ class StoryOverlayRenderer extends StatelessWidget {
         }),
       ),
       CountdownOverlay countdown => _CountdownWidget(countdown: countdown),
-      LinkOverlay link => _LinkWidget(link: link),
-      MentionOverlay mention => _MentionWidget(mention: mention),
+      LinkOverlay link => _LinkWidget(
+        link: link,
+        onTap: () => _interact(link.id, {
+          'type': 'link',
+          'url': link.url,
+        }),
+      ),
+      MentionOverlay mention => _MentionWidget(
+        mention: mention,
+        onTap: () => _interact(mention.id, {
+          'type': 'mention',
+          'userId': mention.userId,
+          'username': mention.username,
+        }),
+      ),
     };
   }
 
@@ -140,7 +145,10 @@ class _PollWidgetState extends State<_PollWidget> {
               child: _PollOptionRow(
                 label: poll.options[i],
                 selected: _votedIndex == i,
-                onTap: () => setState(() => _votedIndex = i),
+                onTap: () {
+                  setState(() => _votedIndex = i);
+                  widget.onVote(i);
+                },
               ),
             ),
         ],
@@ -236,12 +244,10 @@ class _QuizWidgetState extends State<_QuizWidget> {
 
   _QuizOptionState _stateFor(int index) {
     if (_answeredIndex == null) return _QuizOptionState.idle;
-    if (index == quizAnswerIndex) return _QuizOptionState.correct;
+    if (index == widget.quiz.answerIndex) return _QuizOptionState.correct;
     if (index == _answeredIndex) return _QuizOptionState.wrong;
     return _QuizOptionState.dimmed;
   }
-
-  int get quizAnswerIndex => widget.quiz.answerIndex;
 }
 
 enum _QuizOptionState { idle, correct, wrong, dimmed }
@@ -262,11 +268,15 @@ class _QuizOptionRow extends StatelessWidget {
     final (color, textColor, icon) = switch (state) {
       _QuizOptionState.idle => (Colors.white24, Colors.white, null),
       _QuizOptionState.correct => (
-          Colors.green,
-          Colors.white,
-          Icons.check_circle_outline,
-        ),
-      _QuizOptionState.wrong => (Colors.red, Colors.white, Icons.cancel_outlined),
+        Colors.green,
+        Colors.white,
+        Icons.check_circle_outline,
+      ),
+      _QuizOptionState.wrong => (
+        Colors.red,
+        Colors.white,
+        Icons.cancel_outlined,
+      ),
       _QuizOptionState.dimmed => (Colors.white12, Colors.white54, null),
     };
     return GestureDetector(
@@ -286,7 +296,10 @@ class _QuizOptionRow extends StatelessWidget {
             ],
             Text(
               label,
-              style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -335,7 +348,10 @@ class _SliderWidgetState extends State<_SliderWidget> {
             onHorizontalDragUpdate: (details) {
               final box = context.findRenderObject() as RenderBox?;
               if (box == null || box.size.width <= 0) return;
-              final localX = details.localPosition.dx.clamp(0.0, box.size.width);
+              final localX = details.localPosition.dx.clamp(
+                0.0,
+                box.size.width,
+              );
               final fraction = localX / box.size.width;
               final value = slider.minValue +
                   fraction * (slider.maxValue - slider.minValue);
@@ -357,12 +373,7 @@ class _SliderWidgetState extends State<_SliderWidget> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    slider.emoji,
-                    style: TextStyle(
-                      fontSize: 24 + (_dragging ? 8 : 0),
-                    ),
-                  ),
+                  Text(slider.emoji, style: TextStyle(fontSize: 24 + (_dragging ? 8 : 0))),
                   const SizedBox(width: 8),
                   Text(
                     _value.toStringAsFixed(0),
@@ -426,10 +437,7 @@ class _QuestionWidgetState extends State<_QuestionWidget> {
               children: [
                 Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
                 SizedBox(width: 6),
-                Text(
-                  'Sent',
-                  style: TextStyle(color: Colors.white70),
-                ),
+                Text('Sent', style: TextStyle(color: Colors.white70)),
               ],
             )
           else
@@ -536,15 +544,14 @@ class _CountdownWidgetState extends State<_CountdownWidget> {
 
 class _LinkWidget extends StatelessWidget {
   final LinkOverlay link;
+  final VoidCallback onTap;
 
-  const _LinkWidget({required this.link});
+  const _LinkWidget({required this.link, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      // Opening the URL is the host app's call (in-app browser vs external);
-      // the kit only reports the tap.
-      onTap: () => _reportTap(context),
+      onTap: onTap,
       child: _OverlayCard(
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -566,39 +573,33 @@ class _LinkWidget extends StatelessWidget {
       ),
     );
   }
-
-  void _reportTap(BuildContext context) {
-    // The host listens via onOverlayInteraction; navigation stays theirs.
-    final renderer = context
-        .findAncestorWidgetOfExactType<StoryOverlayRenderer>();
-    renderer?.onOverlayInteraction?.call(link.id, {
-      'type': 'link',
-      'url': link.url,
-    });
-  }
 }
 
 class _MentionWidget extends StatelessWidget {
   final MentionOverlay mention;
+  final VoidCallback onTap;
 
-  const _MentionWidget({required this.mention});
+  const _MentionWidget({required this.mention, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return _OverlayCard(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.alternate_email, color: Colors.white, size: 18),
-          const SizedBox(width: 6),
-          Text(
-            mention.username,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onTap: onTap,
+      child: _OverlayCard(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.alternate_email, color: Colors.white, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              mention.username,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
