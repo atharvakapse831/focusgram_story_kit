@@ -81,7 +81,7 @@ void main() {
       await tester.tap(find.text('3'));
       await tester.pump();
 
-      // Wrong pick: correct option turns green, picked option turns red.
+      // Wrong pick reported as incorrect.
       expect(answers['q1']!['correct'], isFalse);
       expect(answers['q1']!['optionIndex'], 0);
 
@@ -173,23 +173,27 @@ void main() {
       expect(taps['m1']!['username'], 'someone');
     });
 
-    testWidgets('countdown shows a running clock', (tester) async {
+    testWidgets('countdown renders a live clock for a future target',
+        (tester) async {
+      final target = DateTime.now().add(const Duration(hours: 2));
+
       await tester.pumpWidget(
         wrap(
-          const StoryOverlayRenderer(
+          StoryOverlayRenderer(
             overlays: [
               CountdownOverlay(
                 id: 'c1',
                 normalizedDx: 0.5,
                 normalizedDy: 0.5,
-                targetTime: null,
+                targetTime: target,
               ),
             ],
           ),
         ),
       );
-      // Placeholder assertion; replaced below by a real target time test.
-      expect(find.byType(StoryOverlayRenderer), findsOneWidget);
+
+      // A 2h countdown starts at ~02:00:00.
+      expect(find.textStartingWith('02:'), findsOneWidget);
     });
   });
 }
