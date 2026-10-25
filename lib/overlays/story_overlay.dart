@@ -1,3 +1,12 @@
+/// Signature for interaction callbacks (poll vote, quiz answer, link tap).
+///
+/// Lives in this base file so the viewer and renderer share one canonical
+/// typedef without circular imports or duplicate exports.
+typedef OnOverlayInteraction = void Function(
+  String overlayId,
+  Map<String, dynamic> payload,
+);
+
 /// Base for every interactive overlay placed on a story item.
 ///
 /// Overlays are data, not pixels: the editor serializes them with
