@@ -153,6 +153,62 @@ All overlay definitions, JSON codecs, validation, and rendering must use a share
 - Dirty content cannot be silently discarded on accidental close.
 - Feature flags block functionality at both UI and state/action layers.
 
+### 3.5.1 Content-to-Story sharing and embedded FocusGram content — P0 contract; P1 polished UX
+
+**Goal:** Let a user add FocusGram content to a story from the relevant content screen or share sheet, then edit its placement alongside their own text, stickers, images, drawings, and backgrounds. Imported content must be represented by a typed, serializable content element—not only a flattened screenshot—when the item requires playback or source context.
+
+**Supported source kinds**
+- **Image post:** a single image shown for the selected story duration.
+- **Multi-image/carousel post:** preserve the media item visible when the user invokes Share/Add to Story. The selected carousel index and selected media identity must travel in the share payload; importing a carousel must not silently reset to its first image.
+- **Video post / short video / long video:** embed playable video content or a content-player layer, not just a thumbnail.
+- **Article:** render a dedicated article story card with a layout designed for reading/previewing article content.
+- **Note:** render a dedicated note story card, distinct from the article card and generic text stickers.
+- **Extensible future content:** add new source kinds through typed content payloads/renderers without adding FocusGram backend dependencies to the package core.
+
+**Share-sheet integration contract**
+- The host app invokes the library with a typed StorySharePayload (name illustrative; final API name is an implementation decision).
+- Payload should carry a schema version, source kind, stable content ID, canonical/deep link when available, relevant author/source metadata, caption/title/summary where appropriate, media descriptors, currently selected carousel media/index, and a media-resolution strategy.
+- Article/note payloads pass the fields available from the source model; renderers must tolerate missing optional metadata.
+- The library must not assume FocusGram authentication, database models, routes, API endpoints, or publishing. The host app resolves authorization, signed URLs, and source data through injected adapters/callbacks.
+- Define separate behaviors for sharing the currently visible media item and, if desired by product UI, sharing a source-content card that retains post/article/note context. The default for a carousel share from a currently visible slide is the exact visible slide unless the share action explicitly specifies another mode.
+- Preserve origin metadata/deep link when supplied so the host can navigate back to the source and the viewer can offer a source-open action.
+
+**Article and note story cards**
+- Provide separate renderers/styles for article and note cards; do not render an article/note as a generic pasted URL or an unstyled paragraph.
+- Card presentation may use available title, excerpt/body preview, author/source, thumbnail/cover, and content-kind treatment. Missing fields must degrade gracefully.
+- Card layout should fit the story canvas, support theme/custom renderer hooks, and preserve a source reference separately from the visual snapshot.
+- Define tap behavior through a host callback (for example, open source); no hidden navigation is performed by the library.
+- Card appearance is part of the editable composition and must be reproducible in preview/export.
+
+**Video duration and playback policy**
+- A video story element supports the full source-video duration where configured story/host policy permits, or a user-selected story duration/clip window.
+- Duration policy must be explicit and configurable: for example, play the whole clip, play a selected trim interval, or fit the clip to a configured story-time window. Never silently truncate a long video.
+- If a long video exceeds a platform or product story limit, expose an explicit policy such as segmenting it across sequential story items, choosing a trim interval, or rejecting it with a clear reason. Do not hardcode a single platform limit into shared model logic.
+- If playback is cut to a selected story-time window, define start offset, end behavior, progress timing, and whether the viewer can continue to the next segment/item.
+- Handle loading/buffering, errors/retry, pause/resume, mute policy, app lifecycle transitions, and cleanup using the same documented lifecycle rules as the viewer engine.
+- Story duration for an image or static content card is the selected page/story duration; for playable video, duration follows the selected video policy and is represented distinctly from static image display duration.
+
+**Editable canvas behavior**
+- Imported post media, video player/layout, article card, and note card are first-class canvas layers with stable IDs and deterministic z-order.
+- During editing, users can move, resize/scale, rotate where supported, duplicate, delete, bring forward/send backward, and align/snap the content layout using the same canvas manipulation system as other overlays.
+- Selection handles, guides, and editor controls must not appear in export.
+- Content layers coexist with user-added text, stickers, imported decorative images, drawings, and background images/colors/gradients. The user can choose layer order where applicable.
+- Preserve the difference between source content's own layout and the editable outer story layer. Transforming the outer layer must not corrupt original media identity or source metadata.
+- For image posts, preserve the selected image crop/layout. For video, the selectable/movable container controls placement and bounds while its player preserves correct aspect ratio and playback.
+- Interactive content such as links or source-open actions must remain functional in viewer mode when requested; do not bake their behavior into pixels.
+
+**Acceptance criteria**
+- A test payload can be created for each source kind: image post, video post, multi-image post, short video, long video, article, and note.
+- Invoking Share/Add to Story from carousel slide N results in slide N being the imported media by default; tests assert the exact media ID/index, not merely that some image appears.
+- Source content can be laid out with normal story text, stickers, images, drawings, and backgrounds without losing layer order or metadata.
+- Article and note cards have distinct renderers and handle missing title/author/thumbnail/excerpt fields without overflow or crashes.
+- A content layer can be selected, moved, scaled, reordered, saved, reopened, and exported with stable geometry.
+- Videos play as video, not as a static placeholder; natural-duration and user-selected-duration policies are both testable.
+- For long videos, any trim/segment/limit behavior is explicit, testable, and never silently truncates media.
+- Playback progress, pause/resume, lifecycle changes, media errors, and disposal behave predictably for embedded video.
+- Share payload and project representation remain JSON-safe and versioned; ephemeral media handles are resolved by adapters rather than serialized as permanent filesystem paths.
+- The library makes no hidden FocusGram API/network requests; host-supplied resolution and navigation callbacks are used.
+- Export/preview behavior is documented for each content kind, including which parts become pixels and which structured actions/source references remain separate.
 ### 3.6 Camera and capture — P1; adapter interface P0
 
 - Replaceable capture adapter and camera lifecycle handling.
@@ -580,11 +636,12 @@ example/
 ### Phase 2 — Minimum usable editor (P0/P1)
 1. Add editor entry, page state, image import, canvas, selection, transforms, and layer ordering.
 2. Add text and supported sticker overlays.
-3. Add backgrounds/canvas configuration.
-4. Implement undo/redo for supported editor commands.
-5. Add draft repository-based save/restore.
-6. Add still-image export with structured overlays delivered separately.
-7. Add render fixtures and verify selection chrome is excluded.
+3. Add Content-to-Story payload/import support for image posts, the exact visible carousel item, playable videos, and dedicated article/note cards; make content layers transformable on the canvas.
+4. Add backgrounds/canvas configuration.
+5. Implement undo/redo for supported editor commands.
+6. Add draft repository-based save/restore.
+7. Add still-image export with structured overlays delivered separately.
+8. Add render fixtures and verify selection chrome is excluded.
 
 **Exit gate:** user can create a multi-page still-image story, save/reopen it, and export deterministic assets without losing structured overlay data.
 
@@ -623,6 +680,8 @@ example/
 - [ ] Viewer navigation, pause/resume, seen callbacks, and disposal pass tests.
 - [ ] Supported overlays render and round-trip without flattening interaction metadata.
 - [ ] Editor supports page operations, image import, overlay manipulation, text/stickers, and backgrounds.
+- [ ] Content-to-Story imports image/video posts, preserves the currently visible carousel item, renders dedicated article/note cards, and supports movable content layers.
+- [ ] Video story elements follow explicit full-duration or selected-clip/story-duration rules; long-video behavior is never silently truncated.
 - [ ] Undo/redo and draft save/restore cover supported edits.
 - [ ] Still-image export matches preview within defined tolerance and excludes editor chrome.
 - [ ] Errors/cancellations are typed and recoverable; temporary outputs are cleaned up.
