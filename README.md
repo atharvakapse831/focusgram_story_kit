@@ -28,6 +28,14 @@ lib/
   viewer/                      # StoryKitViewer + progress/chrome widgets
 ```
 
+
+## Documentation
+
+- [Complete feature inventory](docs/STORY_KIT_FEATURE_INVENTORY.md) — full scope and priorities.
+- [Detailed implementation plan](docs/STORY_KIT_IMPLEMENTATION_PLAN.md) — phase sequence, engineering implications, UI/UX standards, feature instructions, and acceptance criteria.
+- [Phase 1 audit execution plan](docs/PHASE_1_EXECUTION_PLAN.md) — audit-only procedure.
+- [Phase 1 audit report](docs/PHASE_1_AUDIT_REPORT.md) — evidence report template; it is not complete until checks are run and recorded.
+
 ## Status
 
 Pre-1.0 skeleton. Viewer and overlay engine first; editor integration

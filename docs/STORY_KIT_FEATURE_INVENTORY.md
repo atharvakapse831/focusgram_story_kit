@@ -721,3 +721,8 @@ For each feature:
 6. Do not mark a feature complete solely because code compiles or mock UI renders.
 
 **End of inventory.**
+
+
+## 10. Detailed implementation plan
+
+This file is the complete requirements catalogue. Follow the companion [STORY_KIT_IMPLEMENTATION_PLAN.md](STORY_KIT_IMPLEMENTATION_PLAN.md) for source-backed sequencing, technical implications, UI/UX quality levels, per-feature instructions, and acceptance criteria. The [Phase 1 execution plan](PHASE_1_EXECUTION_PLAN.md) remains the audit-only procedure.
