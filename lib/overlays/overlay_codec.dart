@@ -45,7 +45,7 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         id: id,
         normalizedDx: dx,
         normalizedDy: dy,
-        emoji: json['emoji']?.toString() ?? 'smiley',
+        emoji: json['emoji']?.toString() ?? '\u{1F600}',
         question: json['question']?.toString() ?? '',
         minValue: (json['min'] as num?)?.toDouble() ?? 0,
         maxValue: (json['max'] as num?)?.toDouble() ?? 100,
