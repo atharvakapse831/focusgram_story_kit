@@ -54,10 +54,13 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   bool _videoLoading = false;
   VideoPlayerController? _videoController;
 
+  bool get _hasPlayableContent =>
+      widget.groups.any((group) => group.items.isNotEmpty);
+
   @override
   void initState() {
     super.initState();
-    _groupIndex = widget.initialGroupIndex.clamp(0, widget.groups.length - 1);
+    _groupIndex = _resolveInitialGroupIndex();
     _pageController = PageController(initialPage: _groupIndex);
     _progress = AnimationController(vsync: this)
       ..duration = widget.defaultImageDuration
@@ -66,8 +69,40 @@ class _StoryKitViewerState extends State<StoryKitViewer>
           _advance();
         }
       });
-    _startItem();
-    _notifyGroupViewed();
+
+    if (_hasPlayableContent) {
+      _startItem();
+      _notifyGroupViewed();
+    }
+  }
+
+  /// Picks a group that contains items without ever clamping against -1.
+  ///
+  /// Empty groups are ignored for playback. If the requested group and all
+  /// groups after it are empty, the nearest preceding playable group is used.
+  /// If no group contains an item, index zero is retained only as a safe
+  /// controller index; [build] renders the empty state instead.
+  int _resolveInitialGroupIndex() {
+    if (widget.groups.isEmpty) return 0;
+
+    final requestedIndex =
+        widget.initialGroupIndex.clamp(0, widget.groups.length - 1);
+    final nextPlayable =
+        _findPlayableGroupIndex(requestedIndex, direction: 1);
+    if (nextPlayable != -1) return nextPlayable;
+
+    final previousPlayable =
+        _findPlayableGroupIndex(requestedIndex - 1, direction: -1);
+    return previousPlayable == -1 ? 0 : previousPlayable;
+  }
+
+  int _findPlayableGroupIndex(int start, {required int direction}) {
+    for (var index = start;
+        index >= 0 && index < widget.groups.length;
+        index += direction) {
+      if (widget.groups[index].items.isNotEmpty) return index;
+    }
+    return -1;
   }
 
   @override
@@ -83,9 +118,23 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   StoryItemModel get _item =>
       _group.items[_itemIndex.clamp(0, _group.items.length - 1)];
 
-  void _notifyGroupViewed() => widget.onGroupViewed?.call(_group.userId);
+  void _notifyGroupViewed() {
+    if (!_hasPlayableContent ||
+        widget.groups.isEmpty ||
+        widget.groups[_groupIndex].items.isEmpty) {
+      return;
+    }
+    widget.onGroupViewed?.call(_group.userId);
+  }
 
   void _startItem() {
+    if (!_hasPlayableContent ||
+        widget.groups.isEmpty ||
+        _groupIndex >= widget.groups.length ||
+        widget.groups[_groupIndex].items.isEmpty) {
+      return;
+    }
+
     _progress.stop();
     _progress.reset();
     if (_item.type == StoryItemType.video) {
@@ -153,12 +202,19 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   }
 
   void _advance() {
+    if (!_hasPlayableContent) return;
+
     if (_itemIndex < _group.items.length - 1) {
       setState(() => _itemIndex++);
       _startItem();
-    } else if (_groupIndex < widget.groups.length - 1) {
+      return;
+    }
+
+    final nextGroup =
+        _findPlayableGroupIndex(_groupIndex + 1, direction: 1);
+    if (nextGroup != -1) {
       setState(() {
-        _groupIndex++;
+        _groupIndex = nextGroup;
         _itemIndex = 0;
       });
       _pageController.jumpToPage(_groupIndex);
@@ -171,12 +227,19 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   }
 
   void _previous() {
+    if (!_hasPlayableContent) return;
+
     if (_itemIndex > 0) {
       setState(() => _itemIndex--);
       _startItem();
-    } else if (_groupIndex > 0) {
+      return;
+    }
+
+    final previousGroup =
+        _findPlayableGroupIndex(_groupIndex - 1, direction: -1);
+    if (previousGroup != -1) {
       setState(() {
-        _groupIndex--;
+        _groupIndex = previousGroup;
         _itemIndex = _group.items.length - 1;
       });
       _pageController.jumpToPage(_groupIndex);
@@ -211,6 +274,18 @@ class _StoryKitViewerState extends State<StoryKitViewer>
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasPlayableContent) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'No stories available',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -257,7 +332,9 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           Colors.white,
                         ),
-                        value: active ? _progress.value : (completed ? 1.0 : 0.0),
+                        value: active
+                            ? _progress.value
+                            : (completed ? 1.0 : 0.0),
                       ),
                     ),
                   ),
