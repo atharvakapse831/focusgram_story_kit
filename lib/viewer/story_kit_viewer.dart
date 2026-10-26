@@ -53,6 +53,8 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   bool _chromeHidden = false;
   bool _videoLoading = false;
   VideoPlayerController? _videoController;
+  int _videoLoadGeneration = 0;
+  Offset? _tapDownPosition;
 
   bool get _hasPlayableContent =>
       widget.groups.any((group) => group.items.isNotEmpty);
@@ -86,7 +88,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
     if (widget.groups.isEmpty) return 0;
 
     final requestedIndex =
-        widget.initialGroupIndex.clamp(0, widget.groups.length - 1);
+        widget.initialGroupIndex.clamp(0, widget.groups.length - 1).toInt();
     final nextPlayable =
         _findPlayableGroupIndex(requestedIndex, direction: 1);
     if (nextPlayable != -1) return nextPlayable;
@@ -107,16 +109,19 @@ class _StoryKitViewerState extends State<StoryKitViewer>
 
   @override
   void dispose() {
+    // Invalidate any asynchronous initialize() still in flight.
+    _videoLoadGeneration++;
+    _videoController?.removeListener(_onVideoTick);
+    _videoController?.dispose();
     _progress.dispose();
     _pageController.dispose();
-    _videoController?.dispose();
     super.dispose();
   }
 
   StoryGroupModel get _group => widget.groups[_groupIndex];
 
   StoryItemModel get _item =>
-      _group.items[_itemIndex.clamp(0, _group.items.length - 1)];
+      _group.items[_itemIndex.clamp(0, _group.items.length - 1).toInt()];
 
   void _notifyGroupViewed() {
     if (!_hasPlayableContent ||
@@ -140,8 +145,13 @@ class _StoryKitViewerState extends State<StoryKitViewer>
     if (_item.type == StoryItemType.video) {
       _loadVideo();
     } else {
-      _videoController?.dispose();
+      // An image transition invalidates any video initialization that has not
+      // completed yet and releases the previous controller.
+      _videoLoadGeneration++;
+      final previousController = _videoController;
       _videoController = null;
+      previousController?.removeListener(_onVideoTick);
+      previousController?.dispose();
       _videoLoading = false;
       _progress.duration = _item.duration;
       _progress.forward();
@@ -150,14 +160,18 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   }
 
   Future<void> _loadVideo() async {
+    final generation = ++_videoLoadGeneration;
     final url = _item.mediaUrl;
-    _videoController?.dispose();
+    final previousController = _videoController;
     _videoController = null;
+    previousController?.removeListener(_onVideoTick);
+    previousController?.dispose();
     if (mounted) setState(() => _videoLoading = true);
+
     final controller = VideoPlayerController.networkUrl(Uri.parse(url));
     try {
       await controller.initialize();
-      if (!mounted) {
+      if (!mounted || generation != _videoLoadGeneration) {
         controller.dispose();
         return;
       }
@@ -174,9 +188,10 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       controller.addListener(_onVideoTick);
       _progress.forward();
     } catch (_) {
-      // Media failure must never trap the viewer: advance as if the item
-      // had played its default duration.
-      if (!mounted) return;
+      // The local controller is not installed until initialize succeeds, so
+      // dispose it here even when the widget has already moved to another item.
+      controller.dispose();
+      if (!mounted || generation != _videoLoadGeneration) return;
       _videoLoading = false;
       _progress.duration = widget.defaultImageDuration;
       _progress.forward();
@@ -193,12 +208,18 @@ class _StoryKitViewerState extends State<StoryKitViewer>
         : total;
     final fraction = capped.inMilliseconds <= 0
         ? 1.0
-        : (position.inMilliseconds / capped.inMilliseconds).clamp(0.0, 1.0);
-    _progress.value = fraction.clamp(0.0, 1.0);
+        : (position.inMilliseconds / capped.inMilliseconds)
+            .clamp(0.0, 1.0)
+            .toDouble();
+
     if (fraction >= 1.0) {
+      // Let the AnimationController's completed listener be the sole source
+      // of advancement. Calling _advance() here as well can skip two items.
       controller.removeListener(_onVideoTick);
-      _advance();
+      _progress.value = 1.0;
+      return;
     }
+    _progress.value = fraction;
   }
 
   void _advance() {
@@ -250,9 +271,21 @@ class _StoryKitViewerState extends State<StoryKitViewer>
     }
   }
 
-  void _handleTapDown(TapDownDetails details) {
+  void _recordTapDown(TapDownDetails details) {
+    _tapDownPosition = details.globalPosition;
+  }
+
+  void _clearTapDown() {
+    _tapDownPosition = null;
+  }
+
+  void _handleTap() {
+    final position = _tapDownPosition;
+    _tapDownPosition = null;
+    if (position == null || !_hasPlayableContent) return;
+
     final width = MediaQuery.of(context).size.width;
-    if (details.globalPosition.dx < width * 0.30) {
+    if (position.dx < width * 0.30) {
       _previous();
     } else {
       _advance();
@@ -295,15 +328,36 @@ class _StoryKitViewerState extends State<StoryKitViewer>
             itemCount: widget.groups.length,
             physics: const NeverScrollableScrollPhysics(),
             itemBuilder: (context, index) {
+              final group = widget.groups[index];
+              if (group.items.isEmpty) return const SizedBox.shrink();
+              final pageItemIndex = index == _groupIndex ? _itemIndex : 0;
+              final item = group.items[
+                pageItemIndex.clamp(0, group.items.length - 1).toInt()
+              ];
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  _buildMedia(_item),
-                  // Interactive overlays ride above media; their taps are
-                  // absorbed inside overlay bounds and fall through to the
-                  // navigation zones elsewhere.
+                  _buildMedia(item),
+                  // Keep navigation gestures below overlays so an overlay tap
+                  // is handled by the overlay rather than the viewer's zones.
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: _recordTapDown,
+                      onTap: _handleTap,
+                      onTapCancel: _clearTapDown,
+                      onLongPressStart: (_) => _setPaused(true),
+                      onLongPressEnd: (_) {
+                        _setPaused(false);
+                        if (mounted) {
+                          setState(() => _chromeHidden = false);
+                        }
+                      },
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
                   StoryOverlayRenderer(
-                    overlays: _item.overlays,
+                    overlays: item.overlays,
                     onOverlayInteraction: widget.onOverlayInteraction,
                     onOverlayInteractionStarted: () => _setPaused(true),
                   ),
@@ -340,19 +394,6 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                   ),
                 );
               }),
-            ),
-          ),
-
-          // Tap zones (30% prev / 70% next) outside overlay areas.
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTapDown: _handleTapDown,
-              onLongPressStart: (_) => _setPaused(true),
-              onLongPressEnd: (_) {
-                _setPaused(false);
-                setState(() => _chromeHidden = false);
-              },
             ),
           ),
 
