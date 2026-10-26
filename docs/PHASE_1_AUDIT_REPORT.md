@@ -97,11 +97,12 @@ Severity is provisional until the required validation and impact review are comp
 | R8 | Requirements-to-tests traceability incomplete | Assign stable requirement IDs and map each acceptance criterion to implementation, tests, and verification evidence. |
 | R9 | License/provenance assessment incomplete | Inspect dependency licenses and copied/adapted source provenance before release. |
 
-## 7. Requirement traceability status
+## 7. Requirement traceability matrix (source level)
 
-The original audit plan includes a requirement traceability matrix. The current review does not establish that every inventory acceptance criterion is mapped to code and automated tests. Do not mark requirements verified merely because a related class exists.
+The original audit plan includes a requirement traceability matrix. The mapping below records, for each requirement area, the implementation path, the automated tests that exist in the tree, and the evidence status. **No test in this repository has been executed during this audit: every test result is UNVERIFIED, and every runtime-dependent finding remains BLOCKED.** Do not mark a requirement verified merely because a related class or test file exists.
 
-At minimum, create stable IDs for the major domains:
+Stable ID domains:
+
 - `API-###` — public API and host integration
 - `MODEL-###` — story models and serialization
 - `VIEW-###` — viewer playback and navigation
@@ -109,8 +110,35 @@ At minimum, create stable IDs for the major domains:
 - `MEDIA-###` — media lifecycle and rendering
 - `DRAFT-###` — persistence and restoration
 - `SHARE-###` — FocusGram content-to-story integration, in its designated later phase
+- `REL-###` — CI, release, and package hygiene
 
-Each requirement should link to the relevant implementation path, test(s), and evidence status. This mapping remains incomplete pending a full acceptance-criteria pass.
+| ID | Requirement area (inventory §) | Implementation path | Test evidence (results UNEXECUTED) | Evidence status |
+|---|---|---|---|---|
+| API-001 | Curated public exports (§3.1) | `lib/focusgram_story_kit.dart` (6 exports) | None | Source-confirmed; coverage gap |
+| API-002 | Example host app (§3.1) | Absent | None | Planned (later phase) |
+| API-003 | Typed results/errors (§3.1) | Absent — interaction payloads are dynamic maps | None | Planned |
+| MODEL-001 | Item/group models (§3.2) | `lib/models/story_item_model.dart`, `story_group_model.dart` | None — models have no JSON codec | Source-confirmed; coverage gap |
+| MODEL-002 | Schema versioning/migration (§3.2) | Absent | None | Planned (Phase 2; see R4) |
+| MODEL-003 | `sharedContent` contract (§3.2/§3.5.1) | Dynamic `Map<String, dynamic>?`, unvalidated | None | Suspected risk |
+| VIEW-001 | Group/item navigation (§3.3) | `lib/viewer/story_kit_viewer.dart` | None (F1, F2 apply) | Source-confirmed, runtime BLOCKED; coverage gap |
+| VIEW-002 | Progress/duration (§3.3) | `_progress` controller + `_onVideoTick` | None (F4 applies) | Source-confirmed, runtime BLOCKED; coverage gap |
+| VIEW-003 | Hold-to-pause (§3.3) | Long-press handlers | None (F3 applies) | Source-confirmed, runtime BLOCKED; coverage gap |
+| VIEW-004 | 30%/70% tap zones (§3.3) | `_handleTapDown` | None (F3 applies) | Source-confirmed, runtime BLOCKED; coverage gap |
+| VIEW-005 | Video load/error/30s cap (§3.3) | `_loadVideo` | None (F5 applies) | Source-confirmed, runtime BLOCKED; coverage gap |
+| VIEW-006 | Seen tracking (§3.3) | `onGroupViewed` callback | None | Source-confirmed; coverage gap |
+| VIEW-007 | App-lifecycle pause (§3.3) | No `WidgetsBindingObserver` present | None | Design risk (F6) |
+| OVERLAY-001 | 7 overlay types + codec round-trip (§3.4) | `lib/overlays/story_overlay.dart`, `overlay_codec.dart` | `test/overlay_codec_test.dart` exists — UNEXECUTED | Source-confirmed; test outcomes unverified |
+| OVERLAY-002 | Unknown/malformed handling (§3.4) | Codec default case | Partial (unknown→null case covered in unexecuted tests) | Suspected risk (F7) |
+| OVERLAY-003 | Coordinate validation (§3.4) | Absent — `dx/dy` unvalidated | None | Suspected risk |
+| OVERLAY-004 | Rendering/interaction (§3.4) | `lib/viewer/story_overlay_renderer.dart` | `test/story_overlay_renderer_test.dart` exists — UNEXECUTED | Source-confirmed; test outcomes unverified |
+| OVERLAY-005 | Slider geometry (§3.4) | `_SliderWidgetState` drag handler | None (F8 applies) | Source-confirmed, runtime BLOCKED; coverage gap |
+| MEDIA-001 | Image loading/error states (§3.3) | `CachedNetworkImage` branches in the viewer | None | Source-confirmed; coverage gap |
+| MEDIA-002 | Editor/export/capture/drawing/crop/text/stickers (§3.5–§3.15) | Absent | None | Planned (Phases 3–5) |
+| DRAFT-001 | Undo/redo/drafts (§3.16) | Absent | None | Planned (Phase 3) |
+| SHARE-001 | FocusGram content-to-Story (§3.5.1) | Absent by design | None | Planned (Phase 6 — correctly not started) |
+| REL-001 | CI/license/changelog (§3.23) | Absent | 0 workflow runs; no `.github/` directory | Coverage gap (F9; risk R1) |
+
+This mapping is complete at the source level only. Acceptance-criteria verification, and the promotion of any finding to runtime-confirmed, remain BLOCKED pending the runtime verification recorded in Section 3.
 
 ## 8. Exit-criteria checklist
 
@@ -126,7 +154,7 @@ Each requirement should link to the relevant implementation path, test(s), and e
 - [ ] F1–F5 reproduced or disproved with targeted tests/runtime evidence.
 - [ ] Relevant lifecycle, malformed-input, and regression coverage assessed.
 - [ ] Supported-platform build matrix and package/license review completed.
-- [ ] Requirement-to-test traceability completed.
+- [x] Requirement-to-test traceability completed at the source level (Section 7); all test results remain UNEXECUTED/blocked.
 - [ ] Final Phase 1 readiness decision confirmed after blockers are resolved.
 
 ## 9. Final recommendation
