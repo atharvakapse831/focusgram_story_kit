@@ -10,6 +10,18 @@ import 'story_overlay_renderer.dart';
 export '../overlays/story_overlay.dart'
     show OnOverlayInteraction;
 
+/// Controller for explicitly pausing or resuming story playback.
+class StoryKitViewerController {
+  _StoryKitViewerState? _state;
+  bool get isPaused => _state?._paused ?? false;
+  void pause() => _state?._setPaused(true);
+  void resume() => _state?._setPaused(false);
+  void _attach(_StoryKitViewerState state) => _state = state;
+  void _detach(_StoryKitViewerState state) {
+    if (identical(_state, state)) _state = null;
+  }
+}
+
 /// Instagram-class story viewer.
 ///
 /// Ports the useful behaviors from flutter_story_view (per-item duration,
@@ -18,6 +30,7 @@ export '../overlays/story_overlay.dart'
 /// and renders the kit's interactive overlays above the media.
 class StoryKitViewer extends StatefulWidget {
   final List<StoryGroupModel> groups;
+  final StoryKitViewerController? controller;
   final int initialGroupIndex;
   final Duration defaultImageDuration;
   final Duration maxVideoDuration;
@@ -29,6 +42,7 @@ class StoryKitViewer extends StatefulWidget {
   const StoryKitViewer({
     super.key,
     required this.groups,
+    this.controller,
     this.initialGroupIndex = 0,
     this.defaultImageDuration = const Duration(seconds: 5),
     this.maxVideoDuration = const Duration(seconds: 30),
@@ -43,13 +57,14 @@ class StoryKitViewer extends StatefulWidget {
 }
 
 class _StoryKitViewerState extends State<StoryKitViewer>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final PageController _pageController;
   late final AnimationController _progress;
 
   int _groupIndex = 0;
   int _itemIndex = 0;
   bool _paused = false;
+  bool _lifecyclePaused = false;
   bool _chromeHidden = false;
   bool _videoLoading = false;
   VideoPlayerController? _videoController;
@@ -62,6 +77,8 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.controller?._attach(this);
     _groupIndex = _resolveInitialGroupIndex();
     _pageController = PageController(initialPage: _groupIndex);
     _progress = AnimationController(vsync: this)
@@ -108,7 +125,34 @@ class _StoryKitViewerState extends State<StoryKitViewer>
   }
 
   @override
+  void didUpdateWidget(covariant StoryKitViewer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final shouldPause = state != AppLifecycleState.resumed;
+    if (_lifecyclePaused == shouldPause) return;
+    _lifecyclePaused = shouldPause;
+    if (shouldPause) {
+      _progress.stop();
+      _videoController?.pause();
+    } else if (!_paused && _hasPlayableContent) {
+      if (_videoController != null && _progress.value < 1.0) {
+        _videoController?.play();
+      }
+      _progress.forward();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.controller?._detach(this);
     // Invalidate any asynchronous initialize() still in flight.
     _videoLoadGeneration++;
     _videoController?.removeListener(_onVideoTick);
@@ -154,7 +198,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       previousController?.dispose();
       _videoLoading = false;
       _progress.duration = _item.duration;
-      _progress.forward();
+      if (!_paused && !_lifecyclePaused) _progress.forward();
     }
     if (mounted) setState(() {});
   }
@@ -177,7 +221,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       }
       _videoController = controller;
       setState(() => _videoLoading = false);
-      controller.play();
+      if (!_paused && !_lifecyclePaused) controller.play();
       // 30s cap: progress completes when the video reaches the cap, not by a
       // wall-clock timer — pausing the video also pauses the countdown.
       final total = controller.value.duration;
@@ -186,7 +230,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
           : total;
       _progress.duration = capped;
       controller.addListener(_onVideoTick);
-      _progress.forward();
+      if (!_paused && !_lifecyclePaused) _progress.forward();
     } catch (_) {
       // The local controller is not installed until initialize succeeds, so
       // dispose it here even when the widget has already moved to another item.
@@ -194,7 +238,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       if (!mounted || generation != _videoLoadGeneration) return;
       _videoLoading = false;
       _progress.duration = widget.defaultImageDuration;
-      _progress.forward();
+      if (!_paused && !_lifecyclePaused) _progress.forward();
     }
   }
 
@@ -296,7 +340,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
     if (paused) {
       _progress.stop();
       _videoController?.pause();
-    } else {
+    } else if (!_lifecyclePaused) {
       _progress.forward();
       if (_videoController != null && _progress.value < 1.0) {
         _videoController?.play();
