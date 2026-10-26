@@ -1,136 +1,138 @@
 # Phase 1 — Repository Audit Report
 
-**Status:** Not executed — baseline planning document  
+**Status:** BLOCKED — source-level audit and documentation review completed; Flutter/Dart verification and runtime reproduction remain blocked.  
+**Readiness:** NO-GO for starting Phase 2 until the required verification is completed and the high-priority findings are reviewed.  
 **Repository:** [atharvakapse831/focusgram_story_kit](https://github.com/atharvakapse831/focusgram_story_kit)  
-**Reviewed branch/commit:** `main` / `9dde74c0a52d4fc9a7483f20e01cf63ddadf705e`  
-**Purpose:** Record evidence collected during Phase 1. This file is a prepared report template with initial static observations; it must not be interpreted as a completed runtime audit.
+**Branch reviewed:** `main`  
+**HEAD reviewed:** `a5e6cc9f74d2169a25eb51139a30ff73d7f47baf`  
+**Documented baseline:** `9dde74c0a52d4fc9a7483f20e01cf63ddadf705e`  
+**Audit update date:** 2026-10-26
 
 ## 1. Executive summary
 
-Phase 1 is intended to establish the actual state of the reusable Flutter/Dart package before feature work begins. The current GitHub tree shows a small pre-1.0 library centered on story viewing and structured overlays. No local Flutter test, analyzer, dependency resolution, example build, or runtime test has been executed as part of the GitHub-only source review so far.
+The current repository contains a small pre-1.0 Flutter package centered on story viewing and structured overlays. The source and tests were inspected through GitHub. The agent's baseline comparison reports that the commits between the documented baseline and current HEAD (`46ddc39`, `a5e6cc9`) changed documentation only; production source was not changed by those commits.
 
-**Current exit decision:** Pending. Do not mark Phase 1 complete until the execution plan has been run in a clean checkout and findings have been completed.
+The source-level review identified potential correctness and lifecycle defects in viewer navigation, empty-input handling, video completion, controller cleanup, and slider interaction. These are recorded as **source-confirmed observations, not runtime-confirmed defects**, because the available execution sandbox could not run the Flutter/Dart toolchain.
 
-## 2. Revision and environment
+The repository tree contains no `.github/` workflow directory, and the reported workflow-run lookup returned zero runs. This is evidence of no in-repository CI workflow visible in the reviewed tree, not proof that no external CI exists.
 
-| Field | Value |
+**Phase 1 exit criteria are not satisfied. Do not start Phase 2 yet.** A suitable Flutter environment must run the blocked checks and reproduce or disprove the high-priority findings. Do not fix application code as part of this audit.
+
+## 2. Repository and environment evidence
+
+| Item | Result |
 |---|---|
 | Repository | `atharvakapse831/focusgram_story_kit` |
-| Branch reviewed | `main` |
-| Commit SHA | `9dde74c0a52d4fc9a7483f20e01cf63ddadf705e` |
-| Tree response truncated? | No; reported 19 entries |
-| Flutter version | Not run |
-| Dart version | Not run |
-| OS / runner | Not recorded |
-| `flutter pub get` | Not run |
-| `flutter analyze` | Not run |
-| `flutter test` | Not run |
-| CI result | No workflow directory in reviewed tree; external CI not checked |
-| Audit executor | Fill in during execution |
+| Branch | `main` |
+| Reviewed HEAD | `a5e6cc9f74d2169a25eb51139a30ff73d7f47baf` |
+| Documented baseline | `9dde74c0a52d4fc9a7483f20e01cf63ddadf705e` |
+| Baseline-to-HEAD comparison | Agent reports the two intervening commits were documentation-only |
+| Source inspection | Production Dart files, manifest, README, and visible test files reported inspected |
+| In-repository CI | No `.github/` directory found in the reviewed tree; workflow-run lookup reported 0 runs |
+| Execution environment | Sandbox command execution failed on two attempts; Flutter/Dart toolchain checks could not run |
+| Working-tree state | Not available through the GitHub contents/tree review; do not infer a clean local working tree |
 
-## 3. Initial repository map
+The visible tree includes the package barrel, model files, overlay model and codec, viewer and renderer, two test files, `pubspec.yaml`, README, and planning/audit documents.
 
-| Area | Files observed | Static observation |
+## 3. Verification log
+
+| Check | Status | Evidence / next action |
 |---|---|---|
-| Public API | `lib/focusgram_story_kit.dart` | Barrel exports models, overlays, codec, viewer, renderer |
-| Models | `lib/models/story_item_model.dart`, `story_group_model.dart` | Story item has image/video type, media URL, duration, overlays, created time, and optional dynamic `sharedContent` map |
-| Overlay contract | `lib/overlays/story_overlay.dart` | Structured overlay classes and JSON serialization |
-| Codec | `lib/overlays/overlay_codec.dart` | Decoder dispatches by type and returns null for unknown/invalid cases in some paths; full edge-case review pending |
-| Viewer | `lib/viewer/story_kit_viewer.dart` | Main playback widget; lifecycle/state audit pending |
-| Renderer | `lib/viewer/story_overlay_renderer.dart` | Overlay widgets/rendering; detailed behavior audit pending |
-| Tests | `test/overlay_codec_test.dart`, `test/story_overlay_renderer_test.dart` | Two test files visible; actual coverage assessment pending |
-| Manifest | `pubspec.yaml` | Dart `^3.5.0`, Flutter `>=3.24.0`; dependencies include `cached_network_image`, `video_player` |
-| Docs | `README.md`, `docs/STORY_KIT_FEATURE_INVENTORY.md` | README describes viewer/overlay skeleton; inventory is intended scope, not evidence |
-| CI | No `.github` directory observed | Search for external CI and capture actual run evidence before making a final statement |
-| Example app | No `example/` directory observed | A consumer integration example may be a gap; verify against full tree and package workflow |
-| License / changelog | Not evident in the short tree summary | Inspect full root inventory; record provenance and licensing assessment |
+| GitHub connection and repository identity | PASS | Repository and `main` tree retrieved through GitHub |
+| Source/document inspection | REPORTED COMPLETE | Agent reports all visible production Dart files, tests, README, manifest, and four existing planning/audit docs were read |
+| Baseline-to-HEAD comparison | REPORTED PASS | Agent reports the two intervening commits are documentation-only; source-level conclusions should still be rechecked against current HEAD during runtime validation |
+| In-repository workflow directory | NOT FOUND | No `.github/` directory visible in the reviewed tree |
+| Workflow-run lookup | NO RUNS REPORTED | Zero runs returned by the agent's lookup; external CI was not verified |
+| `flutter --version` | BLOCKED | Sandbox failed to execute commands; run in a working Flutter environment |
+| `dart --version` | BLOCKED | Same environment limitation |
+| `flutter doctor -v` | BLOCKED | Same environment limitation |
+| `flutter pub get` | BLOCKED | Dependency resolution not verified |
+| Formatting check | BLOCKED | No Flutter/Dart command could be executed |
+| `flutter analyze` | BLOCKED | Static analyzer results unavailable |
+| `flutter test --reporter expanded` | BLOCKED | Tests not executed |
+| `flutter test --coverage` | BLOCKED | Tests and coverage not executed |
+| `flutter pub outdated` | BLOCKED | Dependency freshness not verified |
+| Supported-platform builds | BLOCKED / NOT RUN | Supported platform matrix must first be established and builds run in a suitable environment |
+| Runtime reproduction of F1–F5 | BLOCKED | Source-level observations require targeted tests or runtime reproduction |
 
-## 4. Verification log
+**Important:** BLOCKED does not mean failed, and it does not mean passed. No test/analyzer/build success is claimed in this report.
 
-Add one row for every command. Include UTC timestamp, OS, tool versions, command, exit code, summary, and artifact/log location.
+## 4. Documentation conflicts
 
-| Check | Status | Result / evidence |
-|---|---|---|
-| Clean checkout / exact SHA | Not run | Pending |
-| `flutter --version` | Not run | Pending |
-| `dart --version` | Not run | Pending |
-| `flutter doctor -v` | Not run | Pending |
-| `flutter pub get` | Not run | Pending |
-| `flutter analyze` | Not run | Pending |
-| `flutter test --reporter expanded` | Not run | Pending |
-| `flutter test --coverage` | Not run | Pending / availability to verify |
-| `flutter pub outdated` | Not run | Pending |
-| Supported host-platform builds | Not run | First define actual claimed platform matrix |
-| Package license / dependency license review | Not run | Pending |
-| External CI checks | Not checked | Pending |
+| ID | Conflict | Evidence and impact | Recommended action |
+|---|---|---|---|
+| C1 | README feature claims exceed the visible overlay model/codec/renderer set | README advertises hashtag, location, GIF, and text stickers, while the reported `StoryOverlay` model contains seven types: poll, quiz, slider, question, countdown, link, and mention. This may misrepresent current package capability. | Confirm intended scope; either implement in the planned phase or revise claims to match current behavior. |
+| C2 | Platform comment conflicts with video plugin dependency | `pubspec.yaml` comment says there are no native plugin platforms, while `video_player` is included and imported by the viewer. This creates ambiguity about host-app setup and supported platforms. | Document supported host platforms, plugin registration/setup, and whether the package relies on host-provided native plugin support. |
+| C3 | Repository-tree counts differ across documents | The audit report describes 19 entries while the implementation plan describes 21 entries for the same baseline. | Recalculate counts from a pinned tree or remove brittle counts and use paths/commit SHAs as evidence. |
 
-## 5. Requirement traceability matrix
+## 5. Findings register
 
-Complete this matrix against every requirement group and acceptance criteria in `STORY_KIT_FEATURE_INVENTORY.md`. Do not mark a requirement verified merely because a class or checklist exists.
+The following findings are based on the agent's source-level review. Unless noted otherwise, runtime reproduction is **pending**. They must not be described as runtime-confirmed defects until verified.
 
-| Requirement area | Source evidence | Test evidence | Status | Finding / next action |
+| ID | Severity (provisional) | Classification | Source evidence reported | Impact / recommended next action |
 |---|---|---|---|---|
-| Public API / host integration | `lib/focusgram_story_kit.dart` and all public types | API smoke test / host sample | Implemented — unverified | Inspect export stability and consumer usability |
-| Project/model schema | `lib/models/*` | Round-trip / malformed payload tests | Partial evidence | Assess versioning, equality, validation, mutability |
-| Overlay model / codec | `lib/overlays/*` | `test/overlay_codec_test.dart` | Implemented — unverified | Inspect every type, wrong-type data, unknown-type semantics |
-| Viewer playback/navigation | `lib/viewer/story_kit_viewer.dart` | Existing tests + lifecycle tests | Implemented — unverified | Full state machine and timer audit needed |
-| Media/rendering/lifecycle | viewer + renderer | Widget/media fakes and device checks | Implemented — unverified | Validate video controller lifecycle and error paths |
-| Editor canvas and manipulation | No dedicated editor files visible in tree | Future tests | Planned / missing pending inspection | Keep as a later implementation task |
-| Import/capture/drawing/adjustment | No dedicated files visible in tree | Future tests | Planned / missing pending inspection | Not in Phase 1 implementation scope |
-| Video editor/export | No editor/export files visible in tree | Future tests | Planned / missing pending inspection | Audit only target expectations and dependencies |
-| FocusGram content-to-story import | Requirement in inventory; model has `sharedContent` map | No feature test observed in current tree summary | Planned / unverified; do not infer implementation | Integration explicitly out of Phase 1 scope |
-| Draft persistence/undo/redo | No dedicated implementation files visible in tree | Future tests | Planned / missing pending inspection | Check full source before final status |
-| CI/release/docs | No `.github` tree observed | Workflow runs not checked | Unverified | Search external checks and record package release gaps |
+| F1 | P1 | Source-confirmed observation; runtime pending | `lib/viewer/story_kit_viewer.dart`: initialization clamps an initial group index using `groups.length - 1`; the empty-list boundary may produce an invalid clamp range. Similar concern reported for item access when a group has no items. | Add empty-groups and empty-items tests; define the expected empty-state API behavior; fix only in an approved remediation task. |
+| F2 | P1 | Source-confirmed observation; runtime pending | `lib/viewer/story_kit_viewer.dart`: reported `PageView.builder` callback renders the current item rather than the item for each page index. | Test multiple pages and assert each page's distinct content; inspect page-index mapping and navigation state. |
+| F3 | P1 | Source-confirmed observation; runtime pending | `lib/viewer/story_kit_viewer.dart`: reported tap detector advances on tap-down while hold-to-pause uses a long press; overlay hit testing may compete with a translucent full-screen detector. | Add gesture tests for tap, hold, overlay interaction, and edge navigation; define gesture precedence before remediation. |
+| F4 | P1 | Source-confirmed observation; runtime pending | `lib/viewer/story_kit_viewer.dart`: reported video tick completion and animation-controller completion can both advance. | Add deterministic video-completion tests and assert exactly one advancement per item. |
+| F5 | P2 | Source-confirmed observation; runtime pending | `lib/viewer/story_kit_viewer.dart`: reported video initialization catch path does not dispose a local controller; stale initialization may install a controller after a newer item starts loading. | Add failure, rapid-item-change, and disposal tests; define cancellation/generation ownership. |
+| F6 | P2 | Design/lifecycle risk | Viewer interaction reportedly pauses playback without a public resume/lifecycle API and lacks a `WidgetsBindingObserver`. | Define pause/resume contract and app foreground/background behavior; test lifecycle transitions. |
+| F7 | P2 | Serialization compatibility risk | `lib/overlays/overlay_codec.dart`: unknown/malformed overlay entries may be dropped during decode/re-encode. | Decide forward-compatibility policy; add unknown-type round-trip tests and avoid silent data loss where preservation is required. |
+| F8 | P3 | Source-confirmed observation; runtime pending | `lib/viewer/story_overlay_renderer.dart`: slider drag fraction reportedly uses the full card render box rather than the slider row's bounds. | Add widget tests for slider hit area and endpoint mapping; verify layout geometry. |
+| F9 | P3 | Repository/package hygiene gap (verify scope) | The reviewed tree reportedly has no `LICENSE`, `CHANGELOG`, `example/`, or `analysis_options.yaml`; no `.github/` workflow was visible. | Confirm publication/distribution expectations and full tree; add appropriate package metadata, example, analyzer policy, and CI in separately approved tasks. |
 
-## 6. Findings register
+Severity is provisional until the required validation and impact review are completed. F1–F5 should be prioritized for reproduction because of their potential impact on correctness and playback.
 
-Add one entry per issue. Separate confirmed defect, test gap, design risk, and future feature.
+## 6. Other risks and architecture decisions
 
-| ID | Severity | Category | Evidence (file/symbol + repro) | Impact | Recommended action | Status |
-|---|---|---|---|---|---|---|
-| AUD-001 | To assign | CI / reproducibility | No `.github` directory in the reviewed tree; external CI not yet checked | No in-repo workflow evidence in this snapshot | Check external CI; otherwise plan minimal CI as a separate follow-up | Open |
-| AUD-002 | To assign | Public example | No `example/` directory visible in the reviewed tree | Consumer API is harder to validate | Confirm full tree; consider example-app follow-up | Open |
-| AUD-003 | To assign | Model schema | `StoryItemModel.sharedContent` is `Map<String, dynamic>?` in source excerpt | Shape/version/validation boundary may be ambiguous | Audit serialization uses and define contract in architecture phase | Investigating |
-| AUD-004 | To assign | Forward compatibility | Codec comments and implementation return null for unknown types | Unknown elements may be dropped when decoding | Trace caller/list behavior and verify intended retention semantics | Investigating |
-| AUD-005 | To assign | Video lifecycle | Model/README describe 30-second cap and manifest includes `video_player` | Duration/progress/lifecycle discrepancies could affect stories | Trace viewer state and controller lifecycle; reproduce in tests if possible | Investigating |
-| AUD-006 | To assign | Manifest/platform | Manifest comment says no native plugin platforms while `video_player` is a dependency | Host/plugin setup expectations may be unclear | Verify actual plugin and host setup requirements | Investigating |
+| ID | Risk / decision | Required follow-up |
+|---|---|---|
+| R1 | Toolchain and dependency state unknown | Run the verification matrix in a clean checkout of the exact reviewed HEAD. |
+| R2 | Viewer timing and video lifecycle may diverge | Specify a single advancement contract and controller ownership/disposal rules, then test edge cases. |
+| R3 | Unknown overlay payloads may not survive round-trip | Decide and document the forward-compatibility/data-retention policy. |
+| R4 | Schema/versioning contract unclear | Define serialization versioning, validation, defaults, and compatibility guarantees before broad model evolution. |
+| R5 | Video duration policy unresolved | Reconcile README's reported 30-second cap with trimming, export duration, configurable limits, and long-video behavior; never silently truncate. |
+| R6 | Platform support and plugin assumptions unclear | Define supported platforms, Flutter/Dart constraints, native plugin setup, and host-app responsibilities. |
+| R7 | Public API/host integration evidence is limited | Add API compatibility checks or a minimal consumer example in a later approved task. |
+| R8 | Requirements-to-tests traceability incomplete | Assign stable requirement IDs and map each acceptance criterion to implementation, tests, and verification evidence. |
+| R9 | License/provenance assessment incomplete | Inspect dependency licenses and copied/adapted source provenance before release. |
 
-## 7. Risk register
+## 7. Requirement traceability status
 
-| Risk ID | Risk | Severity | Likelihood | Evidence / uncertainty | Mitigation |
-|---|---|---|---|---|---|
-| R-01 | Test/analyzer state is unknown | High until checked | Unknown | No local command results captured | Run checks in clean environment and preserve outputs |
-| R-02 | Viewer timer/video lifecycle regressions | To assign | Unknown | Key subsystem exists; runtime trace pending | Map state transitions and test teardown/lifecycle |
-| R-03 | Schema evolution silently loses unknown content | To assign | Unknown | Unknown overlay type returns null in codec | Test unknown-type round trip and decide preservation policy |
-| R-04 | SDK/dependency combinations are not represented by CI | Medium if confirmed | Unknown | No workflow directory visible | Define minimum supported toolchain matrix and add CI in later approved task |
-| R-05 | Third-party port provenance/license obligations unclear | To assign | Unknown | README references prior packages; license inspection pending | Inspect license files and copied/adapted code attribution |
+The original audit plan includes a requirement traceability matrix. The current review does not establish that every inventory acceptance criterion is mapped to code and automated tests. Do not mark requirements verified merely because a related class exists.
 
-## 8. Final result summary (fill after execution)
+At minimum, create stable IDs for the major domains:
+- `API-###` — public API and host integration
+- `MODEL-###` — story models and serialization
+- `VIEW-###` — viewer playback and navigation
+- `OVERLAY-###` — overlay behavior and geometry
+- `MEDIA-###` — media lifecycle and rendering
+- `DRAFT-###` — persistence and restoration
+- `SHARE-###` — FocusGram content-to-story integration, in its designated later phase
 
-- Total requirement areas reviewed: TBD
-- Implemented — verified: TBD
-- Implemented — unverified: TBD
-- Partial: TBD
-- Planned: TBD
-- Deferred: TBD
-- Blocked / not run: TBD
-- Critical findings: TBD
-- High findings: TBD
-- Medium findings: TBD
-- Low findings: TBD
-- Test command summary: TBD
-- Analyzer summary: TBD
-- Dependency/platform summary: TBD
-- License/provenance summary: TBD
+Each requirement should link to the relevant implementation path, test(s), and evidence status. This mapping remains incomplete pending a full acceptance-criteria pass.
 
-## 9. Phase 1 exit gate
+## 8. Exit-criteria checklist
 
-- [ ] Every current source file has been read and mapped to the relevant requirement.
-- [ ] Test/analyzer commands are run or blocked with reason.
-- [ ] Dependency, platform, license/provenance, public API, lifecycle, and documentation reviews are complete.
-- [ ] Confirmed defects have evidence and reproduction steps.
-- [ ] Unknowns are explicitly listed; no unsupported pass claims remain.
-- [ ] Next implementation tasks are ordered by prerequisite and impact.
-- [ ] No feature implementation or FocusGram sharing integration was introduced during the audit.
+- [x] Repository identity and reviewed HEAD recorded.
+- [x] Existing planning and audit documents inspected, according to the agent's report.
+- [x] Source-level observations and documentation conflicts recorded.
+- [x] Available repository-tree evidence recorded.
+- [ ] Flutter/Dart toolchain versions and environment recorded from a working runtime.
+- [ ] Dependencies resolved successfully.
+- [ ] Formatting verification executed.
+- [ ] Static analysis executed and results reviewed.
+- [ ] Unit/widget tests executed and results reviewed.
+- [ ] F1–F5 reproduced or disproved with targeted tests/runtime evidence.
+- [ ] Relevant lifecycle, malformed-input, and regression coverage assessed.
+- [ ] Supported-platform build matrix and package/license review completed.
+- [ ] Requirement-to-test traceability completed.
+- [ ] Final Phase 1 readiness decision confirmed after blockers are resolved.
 
-**Exit recommendation:** Pending execution. The current source-only view is a baseline input, not a completed audit.
+## 9. Final recommendation
+
+**Current status: BLOCKED / NOT COMPLETE.**
+
+Do not start Phase 2 yet. First, use a suitable Flutter environment to run the blocked checks against commit `a5e6cc9f74d2169a25eb51139a30ff73d7f47baf`, record exact output, and reproduce or disprove F1–F5. Then complete the remaining architecture, platform, licensing, and traceability reviews. Reassess readiness based on that evidence.
+
+This report documents audit findings; it does not authorize application-code remediation. Any fix should be scoped as a separate, explicitly approved task. After updating this report, the coding agent must stop and wait for user authorization.
