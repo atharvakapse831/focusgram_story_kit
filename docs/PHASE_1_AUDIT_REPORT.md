@@ -42,7 +42,7 @@ The source review found several **confirmed defects** by code trace (empty-input
 | Codec | `lib/overlays/overlay_codec.dart` | `decodeStoryOverlay` (nullable) + `decodeOverlayList` (drops failures/unknowns) |
 | Viewer | `lib/viewer/story_kit_viewer.dart` | Single `StatefulWidget` owning PageView, progress AnimationController, video controller, gestures, chrome |
 | Renderer | `lib/viewer/story_overlay_renderer.dart` | Stateless dispatcher + per-type widgets; local interaction state in poll/quiz/slider/question/countdown states |
-| Tests | `test/overlay_codec_test.dart` (9 tests), `test/story_overlay_renderer_test.dart` (7 tests) | Codec + renderer only; no viewer tests |
+| Tests | `test/overlay_codec_test.dart` (8 test cases), `test/story_overlay_renderer_test.dart` (7 test cases) | Codec + renderer only; no viewer tests |
 | Manifest | `pubspec.yaml` | `^3.5.0` Dart, `>=3.24.0` Flutter; deps `cached_network_image ^3.4.1`, `video_player ^2.9.2`; dev: `flutter_lints ^5.0.0` |
 | Docs | `README.md` + 4 `docs/` files (2 are this audit's plan/report pair) | See §6 doc conflicts |
 | Missing | No `analysis_options.yaml`, no `.github/`, no `example/`, no root `LICENSE`, no `CHANGELOG.md`, no lockfile | Confirmed absent by full listing |
@@ -72,7 +72,7 @@ All runtime checks are **blocked**: this audit environment has no Flutter SDK, n
 | 3.1 Public API & integration | `lib/focusgram_story_kit.dart`; no FocusGram internals imported | None | Implemented — unverified | No example app (AUD-011); no versioning policy docs |
 | 3.2 Project/document model | `StoryItemModel`, `StoryGroupModel` | None (models lack JSON round-trip entirely) | Partial — models exist but **no serialization, validation, or schema version** | AUD-004, AUD-006; versioned `StoryProject` schema is Phase 2 work |
 | 3.3 Viewer & playback | `lib/viewer/story_kit_viewer.dart` | **No viewer tests** | Implemented — unverified; **confirmed defects** in empty-input, PageView rendering, video failure path | AUD-001, AUD-002, AUD-003, AUD-008, AUD-009, AUD-014 |
-| 3.4 Overlay system & codecs | `story_overlay.dart`, `overlay_codec.dart` | `overlay_codec_test.dart` (9) — good malformed-input coverage for a skeleton | Implemented — partially verified | Silent unknown-type data loss: AUD-005; unvalidated coordinates: AUD-006; hashtag/location/GIF/text-sticker types **absent from code** despite README claims: AUD-012 |
+| 3.4 Overlay system & codecs | `story_overlay.dart`, `overlay_codec.dart` | `overlay_codec_test.dart` (8) — good malformed-input coverage for a skeleton | Implemented — partially verified | Silent unknown-type data loss: AUD-005; unvalidated coordinates: AUD-006; hashtag/location/GIF/text-sticker types **absent from code** despite README claims: AUD-012 |
 | 3.5 Editor shell/pages | None | None | Not present (planned Phase 3) | — |
 | 3.5.1 Content-to-Story | `StoryItemModel.sharedContent` (dynamic map) only | None | Not present; **explicitly out of Phase 1 scope** — remains in its designated later phase (Phase 6 per implementation plan) | AUD-004 records the schema contract ambiguity for later phases |
 | 3.6 Camera/capture | None | None | Not present (planned) | — |
@@ -161,7 +161,7 @@ Phase 2 (core architecture & viewer/overlay contracts) may begin once these cond
 - Confirmed defects: 5 (AUD-001, AUD-002, AUD-003, AUD-008, AUD-012) + 2 doc defects (AUD-013, AUD-014 mismatch)
 - Suspected defects / design risks: 5 (AUD-004, AUD-005, AUD-006, AUD-007, AUD-009)
 - Coverage gaps: 6 (AUD-010, AUD-011, AUD-015, AUD-016, AUD-017, viewer tests)
-- Test commands: 0 run — all blocked (§4); 16 tests exist in 2 files, outcome unverified
+- Test commands: 0 run — all blocked (§4); 15 test cases exist in 2 files (8 codec + 7 renderer), outcomes unverified
 - Analyzer/format: not run — blocked
 - Dependencies: `cached_network_image ^3.4.1`, `video_player ^2.9.2` — declared only; resolution unverified
 
@@ -172,7 +172,7 @@ Phase 2 (core architecture & viewer/overlay contracts) may begin once these cond
 - [x] Dependency, platform, license/provenance, public API, lifecycle, and documentation reviews complete (§3, §5, §7 AUD-014/016)
 - [x] Confirmed defects have evidence and reproduction reasoning; clearly separated from suspected risks and coverage gaps (§7)
 - [x] Unknowns explicitly listed; no unsupported pass claims (§4 residual risk)
-- [x] Next implementation tasks ordered by prerequisite and impact (§9, and `docs/PHASE_2_KICKOFF_TASKS.md`)
+- [x] Next implementation tasks ordered by prerequisite and impact (§9 and `docs/PHASE_1_EXIT_CRITERIA.md` §3)
 - [x] No feature implementation or FocusGram Content-to-Story integration was introduced during the audit
 - [x] Phase 2 go/no-go recommendation recorded with explicit conditions (§9)
 
