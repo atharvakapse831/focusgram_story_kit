@@ -97,6 +97,7 @@ class StoryOverlayRenderer extends StatelessWidget {
           'username': mention.username,
         }),
       ),
+      UnknownStoryOverlay _ => const SizedBox.shrink(),
     };
   }
 
@@ -323,8 +324,26 @@ class _SliderWidget extends StatefulWidget {
 }
 
 class _SliderWidgetState extends State<_SliderWidget> {
-  double _value = 0;
+  final GlobalKey _sliderTrackKey = GlobalKey();
+  late double _value;
   bool _dragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.slider.minValue;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SliderWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.slider.id != widget.slider.id ||
+        oldWidget.slider.minValue != widget.slider.minValue ||
+        oldWidget.slider.maxValue != widget.slider.maxValue) {
+      _value = widget.slider.minValue;
+      _dragging = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -346,12 +365,14 @@ class _SliderWidgetState extends State<_SliderWidget> {
             ),
           GestureDetector(
             onHorizontalDragUpdate: (details) {
-              final box = context.findRenderObject() as RenderBox?;
+              final box =
+                  _sliderTrackKey.currentContext?.findRenderObject() as RenderBox?;
               if (box == null || box.size.width <= 0) return;
-              final localX = details.localPosition.dx.clamp(
-                0.0,
-                box.size.width,
-              );
+              final localX = box
+                  .globalToLocal(details.globalPosition)
+                  .dx
+                  .clamp(0.0, box.size.width)
+                  .toDouble();
               final fraction = localX / box.size.width;
               final value = slider.minValue +
                   fraction * (slider.maxValue - slider.minValue);
@@ -365,6 +386,7 @@ class _SliderWidgetState extends State<_SliderWidget> {
               widget.onSlide(_value);
             },
             child: Container(
+              key: ValueKey('story-slider-${slider.id}'),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.white24,
@@ -373,7 +395,10 @@ class _SliderWidgetState extends State<_SliderWidget> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(slider.emoji, style: TextStyle(fontSize: 24 + (_dragging ? 8 : 0))),
+                  Text(
+                    slider.emoji,
+                    style: TextStyle(fontSize: 24 + (_dragging ? 8 : 0)),
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     _value.toStringAsFixed(0),
