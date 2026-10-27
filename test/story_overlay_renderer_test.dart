@@ -6,21 +6,13 @@ import 'package:focusgram_story_kit/viewer/story_overlay_renderer.dart';
 void main() {
   Widget wrap(Widget child) {
     return MaterialApp(
-      home: Scaffold(
-        body: SizedBox(
-          width: 400,
-          height: 800,
-          child: child,
-        ),
-      ),
+      home: Scaffold(body: SizedBox(width: 400, height: 800, child: child)),
     );
   }
 
   group('StoryOverlayRenderer', () {
     testWidgets('renders empty when there are no overlays', (tester) async {
-      await tester.pumpWidget(
-        wrap(const StoryOverlayRenderer(overlays: [])),
-      );
+      await tester.pumpWidget(wrap(const StoryOverlayRenderer(overlays: [])));
       expect(find.byType(StoryOverlayRenderer), findsOneWidget);
     });
 
@@ -64,7 +56,9 @@ void main() {
       expect(pauseRequested, 1);
     });
 
-    testWidgets('quiz answer reveals correct/wrong states once', (tester) async {
+    testWidgets('quiz answer reveals correct/wrong states once', (
+      tester,
+    ) async {
       final answers = <String, Map<String, dynamic>>{};
 
       await tester.pumpWidget(
@@ -98,8 +92,9 @@ void main() {
       expect(answers['q1']!['optionIndex'], 0);
     });
 
-    testWidgets('slider drag maps track bounds to min and max values',
-        (tester) async {
+    testWidgets('slider drag maps track bounds to min and max values', (
+      tester,
+    ) async {
       final slides = <double>[];
 
       await tester.pumpWidget(
@@ -116,8 +111,8 @@ void main() {
                 maxValue: 100,
               ),
             ],
-            onOverlayInteraction: (id, payload) =>
-                slides.add(payload['value'] as double),
+            onOverlayInteraction:
+                (id, payload) => slides.add(payload['value'] as double),
           ),
         ),
       );
@@ -220,8 +215,9 @@ void main() {
       expect(taps['m1']!['username'], 'someone');
     });
 
-    testWidgets('countdown renders a live clock for a future target',
-        (tester) async {
+    testWidgets('countdown renders a live clock for a future target', (
+      tester,
+    ) async {
       // Use a target 3h out and assert on the hours digits only; a target
       // of now+2h renders 01:59:xx because Duration.inHours truncates.
       final target = DateTime.now().add(const Duration(hours: 3));
@@ -242,7 +238,7 @@ void main() {
       );
 
       // A 3h countdown renders as 02:59:xx (truncating, not rounding).
-      expect(find.textStartingWith('02:59:'), findsOneWidget);
+      expect(find.textContaining('02:59:'), findsOneWidget);
     });
   });
 }

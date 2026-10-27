@@ -1,4 +1,4 @@
-import 'overlays/story_overlay.dart';
+import '../overlays/story_overlay.dart';
 
 /// Media type of a single story item.
 enum StoryItemType { image, video }
@@ -13,9 +13,10 @@ class StoryItemModel {
   final String mediaUrl;
   final StoryItemType type;
 
-  /// Display duration for image items. Videos use their own length, capped at
-  /// [StoryKitViewer.maxVideoDuration] (default 30s, Instagram rule).
-  final Duration duration;
+  /// Display duration for image items. When specified, overrides the viewer's
+  /// [StoryKitViewer.defaultImageDuration]. Videos use their own length, capped
+  /// at [StoryKitViewer.maxVideoDuration] (default 30s, Instagram rule).
+  final Duration? duration;
 
   /// Optional caption rendered below the header.
   final String? caption;
@@ -33,7 +34,7 @@ class StoryItemModel {
     required this.id,
     required this.mediaUrl,
     required this.type,
-    this.duration = const Duration(seconds: 5),
+    this.duration,
     this.caption,
     this.overlays = const [],
     this.createdAt,

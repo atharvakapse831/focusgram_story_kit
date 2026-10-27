@@ -2,10 +2,8 @@
 ///
 /// Lives in this base file so the viewer and renderer share one canonical
 /// typedef without circular imports or duplicate exports.
-typedef OnOverlayInteraction = void Function(
-  String overlayId,
-  Map<String, dynamic> payload,
-);
+typedef OnOverlayInteraction =
+    void Function(String overlayId, Map<String, dynamic> payload);
 
 /// Base for every interactive overlay placed on a story item.
 ///

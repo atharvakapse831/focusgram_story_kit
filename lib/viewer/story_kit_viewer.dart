@@ -7,8 +7,7 @@ import '../models/story_item_model.dart';
 import '../overlays/story_overlay.dart';
 import 'story_overlay_renderer.dart';
 
-export '../overlays/story_overlay.dart'
-    show OnOverlayInteraction;
+export '../overlays/story_overlay.dart' show OnOverlayInteraction;
 
 /// Controller for explicitly pausing or resuming story playback.
 class StoryKitViewerController {
@@ -81,13 +80,14 @@ class _StoryKitViewerState extends State<StoryKitViewer>
     widget.controller?._attach(this);
     _groupIndex = _resolveInitialGroupIndex();
     _pageController = PageController(initialPage: _groupIndex);
-    _progress = AnimationController(vsync: this)
-      ..duration = widget.defaultImageDuration
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          _advance();
-        }
-      });
+    _progress =
+        AnimationController(vsync: this)
+          ..duration = widget.defaultImageDuration
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed) {
+              _advance();
+            }
+          });
 
     if (_hasPlayableContent) {
       _startItem();
@@ -106,19 +106,22 @@ class _StoryKitViewerState extends State<StoryKitViewer>
 
     final requestedIndex =
         widget.initialGroupIndex.clamp(0, widget.groups.length - 1).toInt();
-    final nextPlayable =
-        _findPlayableGroupIndex(requestedIndex, direction: 1);
+    final nextPlayable = _findPlayableGroupIndex(requestedIndex, direction: 1);
     if (nextPlayable != -1) return nextPlayable;
 
-    final previousPlayable =
-        _findPlayableGroupIndex(requestedIndex - 1, direction: -1);
+    final previousPlayable = _findPlayableGroupIndex(
+      requestedIndex - 1,
+      direction: -1,
+    );
     return previousPlayable == -1 ? 0 : previousPlayable;
   }
 
   int _findPlayableGroupIndex(int start, {required int direction}) {
-    for (var index = start;
-        index >= 0 && index < widget.groups.length;
-        index += direction) {
+    for (
+      var index = start;
+      index >= 0 && index < widget.groups.length;
+      index += direction
+    ) {
       if (widget.groups[index].items.isNotEmpty) return index;
     }
     return -1;
@@ -197,7 +200,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       previousController?.removeListener(_onVideoTick);
       previousController?.dispose();
       _videoLoading = false;
-      _progress.duration = _item.duration;
+      _progress.duration = _item.duration ?? widget.defaultImageDuration;
       if (!_paused && !_lifecyclePaused) _progress.forward();
     }
     if (mounted) setState(() {});
@@ -225,9 +228,8 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       // 30s cap: progress completes when the video reaches the cap, not by a
       // wall-clock timer — pausing the video also pauses the countdown.
       final total = controller.value.duration;
-      final capped = total > widget.maxVideoDuration
-          ? widget.maxVideoDuration
-          : total;
+      final capped =
+          total > widget.maxVideoDuration ? widget.maxVideoDuration : total;
       _progress.duration = capped;
       controller.addListener(_onVideoTick);
       if (!_paused && !_lifecyclePaused) _progress.forward();
@@ -250,14 +252,14 @@ class _StoryKitViewerState extends State<StoryKitViewer>
     if (controller == null) return;
     final position = controller.value.position;
     final total = controller.value.duration;
-    final capped = total > widget.maxVideoDuration
-        ? widget.maxVideoDuration
-        : total;
-    final fraction = capped.inMilliseconds <= 0
-        ? 1.0
-        : (position.inMilliseconds / capped.inMilliseconds)
-            .clamp(0.0, 1.0)
-            .toDouble();
+    final capped =
+        total > widget.maxVideoDuration ? widget.maxVideoDuration : total;
+    final fraction =
+        capped.inMilliseconds <= 0
+            ? 1.0
+            : (position.inMilliseconds / capped.inMilliseconds)
+                .clamp(0.0, 1.0)
+                .toDouble();
 
     if (fraction >= 1.0) {
       // Let the AnimationController's completed listener be the sole source
@@ -278,8 +280,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       return;
     }
 
-    final nextGroup =
-        _findPlayableGroupIndex(_groupIndex + 1, direction: 1);
+    final nextGroup = _findPlayableGroupIndex(_groupIndex + 1, direction: 1);
     if (nextGroup != -1) {
       setState(() {
         _groupIndex = nextGroup;
@@ -303,8 +304,10 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       return;
     }
 
-    final previousGroup =
-        _findPlayableGroupIndex(_groupIndex - 1, direction: -1);
+    final previousGroup = _findPlayableGroupIndex(
+      _groupIndex - 1,
+      direction: -1,
+    );
     if (previousGroup != -1) {
       setState(() {
         _groupIndex = previousGroup;
@@ -378,9 +381,10 @@ class _StoryKitViewerState extends State<StoryKitViewer>
               final group = widget.groups[index];
               if (group.items.isEmpty) return const SizedBox.shrink();
               final pageItemIndex = index == _groupIndex ? _itemIndex : 0;
-              final item = group.items[
-                pageItemIndex.clamp(0, group.items.length - 1).toInt()
-              ];
+              final item =
+                  group.items[pageItemIndex
+                      .clamp(0, group.items.length - 1)
+                      .toInt()];
               return Stack(
                 fit: StackFit.expand,
                 children: [
@@ -439,9 +443,10 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                             valueColor: const AlwaysStoppedAnimation<Color>(
                               Colors.white,
                             ),
-                            value: active
-                                ? progressValue
-                                : (completed ? 1.0 : 0.0),
+                            value:
+                                active
+                                    ? progressValue
+                                    : (completed ? 1.0 : 0.0),
                           ),
                         ),
                       ),
@@ -460,14 +465,16 @@ class _StoryKitViewerState extends State<StoryKitViewer>
             child: AnimatedOpacity(
               opacity: _chromeHidden ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 250),
-              child: widget.headerBuilder?.call(context, _group) ??
+              child:
+                  widget.headerBuilder?.call(context, _group) ??
                   Row(
                     children: [
                       if (_group.avatarUrl != null)
                         CircleAvatar(
                           radius: 16,
-                          backgroundImage:
-                              CachedNetworkImageProvider(_group.avatarUrl!),
+                          backgroundImage: CachedNetworkImageProvider(
+                            _group.avatarUrl!,
+                          ),
                         ),
                       const SizedBox(width: 8),
                       Text(

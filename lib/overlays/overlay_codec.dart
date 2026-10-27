@@ -10,15 +10,23 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
     }
     final rawDx = json['dx'];
     final rawDy = json['dy'];
-    final dx = rawDx is num && rawDx.isFinite
-        ? rawDx.toDouble().clamp(0.0, 1.0).toDouble()
-        : 0.5;
-    final dy = rawDy is num && rawDy.isFinite
-        ? rawDy.toDouble().clamp(0.0, 1.0).toDouble()
-        : 0.5;
+    final dx =
+        rawDx is num && rawDx.isFinite
+            ? rawDx.toDouble().clamp(0.0, 1.0).toDouble()
+            : 0.5;
+    final dy =
+        rawDy is num && rawDy.isFinite
+            ? rawDy.toDouble().clamp(0.0, 1.0).toDouble()
+            : 0.5;
     bool validPosition() =>
-        rawDx is num && rawDx.isFinite && rawDx >= 0 && rawDx <= 1 &&
-        rawDy is num && rawDy.isFinite && rawDy >= 0 && rawDy <= 1;
+        rawDx is num &&
+        rawDx.isFinite &&
+        rawDx >= 0 &&
+        rawDx <= 1 &&
+        rawDy is num &&
+        rawDy.isFinite &&
+        rawDy >= 0 &&
+        rawDy <= 1;
 
     switch (type) {
       case 'poll':
@@ -26,15 +34,17 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         final options = json['options'];
         final allowMultiple = json['allowMultiple'];
         if ((options != null && options is! List) ||
-            (allowMultiple != null && allowMultiple is! bool)) return null;
+            (allowMultiple != null && allowMultiple is! bool))
+          return null;
         return PollOverlay(
           id: id,
           normalizedDx: dx,
           normalizedDy: dy,
           question: json['question']?.toString() ?? '',
-          options: options is List
-              ? options.map((value) => value.toString()).toList()
-              : const <String>[],
+          options:
+              options is List
+                  ? options.map((value) => value.toString()).toList()
+                  : const <String>[],
           allowMultiple: allowMultiple as bool? ?? false,
         );
       case 'quiz':
@@ -42,10 +52,12 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         final options = json['options'];
         final answer = json['answerIndex'];
         if ((options != null && options is! List) ||
-            (answer != null && answer is! num)) return null;
-        final values = options is List
-            ? options.map((value) => value.toString()).toList()
-            : const <String>[];
+            (answer != null && answer is! num))
+          return null;
+        final values =
+            options is List
+                ? options.map((value) => value.toString()).toList()
+                : const <String>[];
         final answerIndex = answer is num ? answer.toInt() : 0;
         return QuizOverlay(
           id: id,
@@ -53,9 +65,10 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
           normalizedDy: dy,
           question: json['question']?.toString() ?? '',
           options: values,
-          answerIndex: values.isEmpty
-              ? 0
-              : answerIndex.clamp(0, values.length - 1).toInt(),
+          answerIndex:
+              values.isEmpty
+                  ? 0
+                  : answerIndex.clamp(0, values.length - 1).toInt(),
         );
       case 'slider':
         if (!validPosition()) return null;
