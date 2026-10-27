@@ -147,6 +147,7 @@ class _PollWidgetState extends State<_PollWidget> {
                 label: poll.options[i],
                 selected: _votedIndex == i,
                 onTap: () {
+                  if (_votedIndex != null) return;
                   setState(() => _votedIndex = i);
                   widget.onVote(i);
                 },
@@ -324,6 +325,8 @@ class _SliderWidget extends StatefulWidget {
 }
 
 class _SliderWidgetState extends State<_SliderWidget> {
+  // Attached to the slider track so drag positions map to the track's own
+  // bounds, not the whole overlay card (which includes the question text).
   final GlobalKey _sliderTrackKey = GlobalKey();
   late double _value;
   bool _dragging = false;
@@ -366,7 +369,8 @@ class _SliderWidgetState extends State<_SliderWidget> {
           GestureDetector(
             onHorizontalDragUpdate: (details) {
               final box =
-                  _sliderTrackKey.currentContext?.findRenderObject() as RenderBox?;
+                  _sliderTrackKey.currentContext?.findRenderObject()
+                      as RenderBox?;
               if (box == null || box.size.width <= 0) return;
               final localX = box
                   .globalToLocal(details.globalPosition)
@@ -386,7 +390,7 @@ class _SliderWidgetState extends State<_SliderWidget> {
               widget.onSlide(_value);
             },
             child: Container(
-              key: ValueKey('story-slider-${slider.id}'),
+              key: _sliderTrackKey,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.white24,
