@@ -18,7 +18,8 @@ void main() {
             controller: controller,
             groups: const [
               StoryGroupModel(
-                userId: 'u1', username: 'controller',
+                userId: 'u1',
+                username: 'controller',
                 items: [StoryItemModel(
                   id: 'one', mediaUrl: 'https://example.com/one.jpg',
                   type: StoryItemType.image,
@@ -99,7 +100,7 @@ void main() {
     });
   });
 
-  group('StoryKitViewer empty input', {
+  group('StoryKitViewer empty input', () {
     testWidgets('renders an empty state when there are no groups',
         (tester) async {
       await tester.pumpWidget(
@@ -134,7 +135,6 @@ void main() {
       expect(find.text('No stories available'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
-
 
     testWidgets('overlay taps do not trigger story navigation',
         (tester) async {

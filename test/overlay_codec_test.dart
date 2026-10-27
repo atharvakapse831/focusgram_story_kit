@@ -75,13 +75,66 @@ void main() {
       );
     });
 
-    test('unknown type decodes to null (forward compatibility)', () {
+    test('unknown type is preserved for forward compatibility', () {
+      final decoded = decodeStoryOverlay({
+        'type': 'hologram',
+        'id': 'h1',
+        'dx': 0.5,
+        'dy': 0.5,
+        'hologramPayload': {'depth': 3},
+      });
+      expect(decoded, isA<UnknownStoryOverlay>());
+      final unknown = decoded! as UnknownStoryOverlay;
+      expect(unknown.type, 'hologram');
+      expect(unknown.id, 'h1');
+    });
+
+    test('unknown overlay survives a decode/re-encode round-trip', () {
+      const source = {
+        'type': 'hologram',
+        'id': 'h1',
+        'dx': 0.5,
+        'dy': 0.5,
+        'hologramPayload': {'depth': 3},
+      };
+      final decoded = decodeStoryOverlay(source);
+      expect(decoded, isA<UnknownStoryOverlay>());
+      final reEncoded = decoded!.toJson();
+      expect(reEncoded, source);
+    });
+
+    test('malformed known types are rejected, not wrapped', () {
+      // Invalid position on a known type must not be preserved as playable
+      // content; only unknown types are wrapped.
       expect(
         decodeStoryOverlay({
-          'type': 'hologram',
-          'id': 'h1',
+          'type': 'poll',
+          'id': 'p2',
+          'dx': 5,
+          'dy': 0.5,
+          'question': 'Broken position',
+          'options': ['A'],
+        }),
+        isNull,
+      );
+      expect(
+        decodeStoryOverlay({
+          'type': 'slider',
+          'id': 's2',
           'dx': 0.5,
           'dy': 0.5,
+          'min': 100,
+          'max': 0,
+        }),
+        isNull,
+      );
+      expect(
+        decodeStoryOverlay({
+          'type': 'countdown',
+          'id': 'c2',
+          'dx': 0.5,
+          'dy': 0.5,
+          'targetTime': 'also not a date',
         }),
         isNull,
       );
@@ -102,7 +155,7 @@ void main() {
   });
 
   group('decodeOverlayList', () {
-    test('skips non-map entries and failed decodes', () {
+    test('skips non-map entries and malformed known types', () {
       final list = decodeOverlayList([
         'junk-string',
         {
@@ -112,10 +165,34 @@ void main() {
           'dy': 0.5,
           'prompt': 'Ask me',
         },
-        {'type': 'unknown-thing', 'id': 'u1', 'dx': 0.5, 'dy': 0.5},
+        {
+          // Malformed known type (position out of range) is dropped.
+          'type': 'poll',
+          'id': 'p3',
+          'dx': 7,
+          'dy': 0.5,
+          'question': 'Broken',
+          'options': ['A'],
+        },
+        42,
       ]);
       expect(list.length, 1);
       expect(list.first, isA<QuestionOverlay>());
+    });
+
+    test('preserves unknown overlay types in lists', () {
+      final list = decodeOverlayList([
+        {'type': 'hologram', 'id': 'h1', 'dx': 0.5, 'dy': 0.5},
+        {
+          'type': 'question',
+          'id': 'q1',
+          'dx': 0.5,
+          'dy': 0.5,
+          'prompt': 'Ask me',
+        },
+      ]);
+      expect(list.length, 2);
+      expect(list.whereType<UnknownStoryOverlay>(), isNotEmpty);
     });
   });
 
