@@ -28,7 +28,9 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         if ((options != null && options is! List) ||
             (allowMultiple != null && allowMultiple is! bool)) return null;
         return PollOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy,
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
           question: json['question']?.toString() ?? '',
           options: options is List
               ? options.map((value) => value.toString()).toList()
@@ -46,7 +48,9 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
             : const <String>[];
         final answerIndex = answer is num ? answer.toInt() : 0;
         return QuizOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy,
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
           question: json['question']?.toString() ?? '',
           options: values,
           answerIndex: values.isEmpty
@@ -66,15 +70,20 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
           return null;
         }
         return SliderOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy,
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
           emoji: json['emoji']?.toString() ?? '\u{1F600}',
           question: json['question']?.toString() ?? '',
-          minValue: minValue, maxValue: maxValue,
+          minValue: minValue,
+          maxValue: maxValue,
         );
       case 'question':
         if (!validPosition()) return null;
         return QuestionOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy,
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
           prompt: json['prompt']?.toString() ?? '',
         );
       case 'countdown':
@@ -82,14 +91,20 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         final target = DateTime.tryParse(json['targetTime']?.toString() ?? '');
         if (target == null) return null;
         return CountdownOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy, targetTime: target,
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
+          targetTime: target,
         );
       case 'link':
         if (!validPosition()) return null;
         final url = json['url']?.toString() ?? '';
         if (!LinkOverlay.isValidUrl(url)) return null;
         return LinkOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy, url: url,
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
+          url: url,
           displayDomain: json['displayDomain']?.toString() ?? '',
         );
       case 'mention':
@@ -98,13 +113,19 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         final username = json['username']?.toString();
         if (userId == null || userId.isEmpty || username == null) return null;
         return MentionOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy,
-          userId: userId, username: username,
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
+          userId: userId,
+          username: username,
         );
       default:
         return UnknownStoryOverlay(
-          id: id, normalizedDx: dx, normalizedDy: dy,
-          type: type, rawData: Map<String, dynamic>.from(json),
+          id: id,
+          normalizedDx: dx,
+          normalizedDy: dy,
+          type: type,
+          rawData: Map<String, dynamic>.from(json),
         );
     }
   } catch (_) {
@@ -117,7 +138,8 @@ List<StoryOverlay> decodeOverlayList(List<dynamic>? jsonList) {
   if (jsonList == null) return const [];
   final overlays = <StoryOverlay>[];
   for (final entry in jsonList) {
-    if (entry is! Map || entry.keys.any((key) => key is! String) continue;
+    if (entry is! Map) continue;
+    if (entry.keys.any((key) => key is! String)) continue;
     final overlay = decodeStoryOverlay(Map<String, dynamic>.from(entry));
     if (overlay != null) overlays.add(overlay);
   }
