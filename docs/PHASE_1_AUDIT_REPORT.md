@@ -100,8 +100,10 @@ The requirement traceability matrix is now recorded in [PHASE_1_REQUIREMENT_TRAC
 - [x] Flutter/Dart toolchain versions and environment recorded from a working runtime (Flutter 3.47.8, Dart 3.13.7).
 - [x] Dependencies resolved successfully (`flutter pub get` -> 0).
 - [x] Formatting verification executed (`dart format --output=none --set-exit-if-changed .` -> 0).
-- [x] Earlier runner's static-analysis pass is recorded. [ ] Independent re-verification completed — blocked by analysis-server exit -9; see [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md).
-- [x] Earlier runner's 25/25 test result is recorded. [ ] Independent re-verification completed — runner timed out during test loading; see [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md).
+- [x] Earlier runner's static-analysis pass is recorded.
+- [ ] Independent re-verification completed — blocked by analysis-server exit -9; see [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md).
+- [x] Earlier runner's 25/25 test result is recorded.
+- [ ] Independent re-verification completed — runner timed out during test loading; see [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md).
 - [x] F1–F5 reproduced and resolved with targeted tests and runtime evidence.
 - [x] Relevant lifecycle, malformed-input, and regression coverage assessed.
 - [ ] Supported-platform build matrix and package/license/provenance review completed; evidence remains incomplete and must be resolved or explicitly waived.
