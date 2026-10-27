@@ -34,8 +34,9 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         final options = json['options'];
         final allowMultiple = json['allowMultiple'];
         if ((options != null && options is! List) ||
-            (allowMultiple != null && allowMultiple is! bool))
+            (allowMultiple != null && allowMultiple is! bool)) {
           return null;
+        }
         return PollOverlay(
           id: id,
           normalizedDx: dx,
@@ -52,8 +53,9 @@ StoryOverlay? decodeStoryOverlay(Map<String, dynamic> json) {
         final options = json['options'];
         final answer = json['answerIndex'];
         if ((options != null && options is! List) ||
-            (answer != null && answer is! num))
+            (answer != null && answer is! num)) {
           return null;
+        }
         final values =
             options is List
                 ? options.map((value) => value.toString()).toList()
