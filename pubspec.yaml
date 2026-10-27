@@ -12,8 +12,10 @@ topics:
   - flutter
 
 environment:
-  sdk: ^3.5.0
-  flutter: ">=3.24.0"
+  # Wildcard `_` parameters (used in _buildMedia image builders) require
+  # Dart 3.7+; do not lower this constraint without removing that syntax.
+  sdk: ^3.7.0
+  flutter: ">=3.29.0"
 
 dependencies:
   flutter:
@@ -30,4 +32,4 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 flutter:
-  # No native plugin platforms in this package — pure Dart/UI + widget tests.
+  # No package assets are bundled. video_player uses native plugin implementations
