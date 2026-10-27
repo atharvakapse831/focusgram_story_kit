@@ -43,8 +43,8 @@ The runner report records passing format, analysis, and tests, but Phase 1 exit 
 | `dart --version` | PASS | Dart SDK version: 3.13.7 |
 | `flutter pub get` | PASS | Exit code 0, 76 dependencies resolved |
 | Formatting check (`dart format --output=none --set-exit-if-changed .`) | PASS | Exit code 0, 10 files checked, 0 changed |
-| `flutter analyze` | PASS | Exit code 0, No issues found |
-| `flutter test --reporter expanded` | PASS | Exit code 0, 25/25 tests passed |
+| `flutter analyze` | EARLIER RUN PASS; INDEPENDENT RE-RUN BLOCKED | Earlier runner recorded exit 0; the independent Flutter 3.29.3 re-run stopped because the analysis server exited with code -9. See [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md). |
+| `flutter test --reporter expanded` | EARLIER RUN PASS; INDEPENDENT RE-RUN BLOCKED | Earlier runner recorded 25/25 passing; the independent re-run exceeded the 180-second limit while loading a test file and returned no test verdict. See [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md). |
 | Runtime verification of F1–F8 | PASS | Verified with automated widget and unit tests |
 
 ## 4. Documentation conflicts
@@ -100,8 +100,8 @@ The requirement traceability matrix is now recorded in [PHASE_1_REQUIREMENT_TRAC
 - [x] Flutter/Dart toolchain versions and environment recorded from a working runtime (Flutter 3.47.8, Dart 3.13.7).
 - [x] Dependencies resolved successfully (`flutter pub get` -> 0).
 - [x] Formatting verification executed (`dart format --output=none --set-exit-if-changed .` -> 0).
-- [x] Static analysis executed and results reviewed (`flutter analyze` -> 0).
-- [x] Unit/widget tests executed and results reviewed (`flutter test --reporter expanded` -> 25/25 passed).
+- [x] Earlier runner's static-analysis pass is recorded. [ ] Independent re-verification completed — blocked by analysis-server exit -9; see [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md).
+- [x] Earlier runner's 25/25 test result is recorded. [ ] Independent re-verification completed — runner timed out during test loading; see [PHASE_1_REVERIFICATION_2026-10-27.md](PHASE_1_REVERIFICATION_2026-10-27.md).
 - [x] F1–F5 reproduced and resolved with targeted tests and runtime evidence.
 - [x] Relevant lifecycle, malformed-input, and regression coverage assessed.
 - [ ] Supported-platform build matrix and package/license/provenance review completed; evidence remains incomplete and must be resolved or explicitly waived.
