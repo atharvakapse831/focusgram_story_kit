@@ -1,4 +1,4 @@
-import 'overlays/story_overlay.dart';
+import '../overlays/story_overlay.dart';
 
 /// Media type of a single story item.
 enum StoryItemType { image, video }

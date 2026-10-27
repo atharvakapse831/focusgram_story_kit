@@ -98,6 +98,7 @@ class StoryOverlayRenderer extends StatelessWidget {
         }),
       ),
       UnknownStoryOverlay _ => const SizedBox.shrink(),
+      _ => const SizedBox.shrink(),
     };
   }
 
@@ -520,11 +521,12 @@ class _CountdownWidget extends StatefulWidget {
 
 class _CountdownWidgetState extends State<_CountdownWidget> {
   late Timer _timer;
-  Duration _remaining = widget.countdown.targetTime.difference(DateTime.now());
+  Duration _remaining = Duration.zero;
 
   @override
   void initState() {
     super.initState();
+    _remaining = widget.countdown.targetTime.difference(DateTime.now());
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() {
