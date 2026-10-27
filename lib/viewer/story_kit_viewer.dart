@@ -236,7 +236,10 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       // dispose it here even when the widget has already moved to another item.
       controller.dispose();
       if (!mounted || generation != _videoLoadGeneration) return;
-      _videoLoading = false;
+      // Media failure must never trap the viewer: advance as if the item
+      // had played its default duration. Clear the loading state so the
+      // spinner does not stay up forever.
+      setState(() => _videoLoading = false);
       _progress.duration = widget.defaultImageDuration;
       if (!_paused && !_lifecyclePaused) _progress.forward();
     }
@@ -410,35 +413,43 @@ class _StoryKitViewerState extends State<StoryKitViewer>
             },
           ),
 
-          // Progress segments across the current group's items.
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 8,
-            right: 8,
-            child: Row(
-              children: List.generate(_group.items.length, (i) {
-                final active = i == _itemIndex;
-                final completed = i < _itemIndex;
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: SizedBox(
-                      height: 3,
-                      child: LinearProgressIndicator(
-                        minHeight: 3,
-                        backgroundColor: Colors.white24,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Colors.white,
+          // Progress segments across the current group's items. The
+          // AnimationController drives both the bar geometry and the rebuild,
+          // so the active segment advances smoothly while the item plays.
+          AnimatedBuilder(
+            animation: _progress,
+            builder: (context, child) {
+              final progressValue = _progress.value;
+              return Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: 8,
+                right: 8,
+                child: Row(
+                  children: List.generate(_group.items.length, (i) {
+                    final active = i == _itemIndex;
+                    final completed = i < _itemIndex;
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: SizedBox(
+                          height: 3,
+                          child: LinearProgressIndicator(
+                            minHeight: 3,
+                            backgroundColor: Colors.white24,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                            value: active
+                                ? progressValue
+                                : (completed ? 1.0 : 0.0),
+                          ),
                         ),
-                        value: active
-                            ? _progress.value
-                            : (completed ? 1.0 : 0.0),
                       ),
-                    ),
-                  ),
-                );
-              }),
-            ),
+                    );
+                  }),
+                ),
+              );
+            },
           ),
 
           // Header (host-provided or default).
