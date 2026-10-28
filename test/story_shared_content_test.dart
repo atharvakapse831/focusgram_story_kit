@@ -183,6 +183,49 @@ void main() {
       expect(updated.badgeText, 'FEATURED');
       expect(updated.type, StoryKitContentType.imagePost);
     });
+
+    test(
+      'equality and hashCode are consistent regardless of extra map insertion order',
+      () {
+        final mapA = <String, dynamic>{
+          'first': 1,
+          'second': 'two',
+          'third': true,
+        };
+        final mapB = <String, dynamic>{
+          'third': true,
+          'first': 1,
+          'second': 'two',
+        };
+
+        final contentA = StorySharedContent(
+          id: 'eq_1',
+          type: StoryKitContentType.article,
+          title: 'Map Order Test',
+          extra: mapA,
+        );
+
+        final contentB = StorySharedContent(
+          id: 'eq_1',
+          type: StoryKitContentType.article,
+          title: 'Map Order Test',
+          extra: mapB,
+        );
+
+        expect(contentA == contentB, isTrue);
+        expect(contentA.hashCode, equals(contentB.hashCode));
+
+        const unequalContent = StorySharedContent(
+          id: 'eq_1',
+          type: StoryKitContentType.article,
+          title: 'Map Order Test',
+          extra: {'first': 1, 'second': 'two', 'third': false},
+        );
+
+        expect(contentA == unequalContent, isFalse);
+        expect(contentA.hashCode == unequalContent.hashCode, isFalse);
+      },
+    );
   });
 
   group('StoryItemModel with StorySharedContent', () {

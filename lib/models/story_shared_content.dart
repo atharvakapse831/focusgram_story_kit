@@ -224,6 +224,12 @@ class StorySharedContent {
         mapEquals(other.extra, extra);
   }
 
+  static int _hashExtra(Map<String, dynamic> map) {
+    if (map.isEmpty) return 0;
+    final sortedKeys = map.keys.toList()..sort();
+    return Object.hashAll(sortedKeys.map((key) => Object.hash(key, map[key])));
+  }
+
   @override
   int get hashCode => Object.hash(
     id,
@@ -237,6 +243,6 @@ class StorySharedContent {
     badgeText,
     deepLinkUrl,
     duration,
-    Object.hashAll(extra.entries),
+    _hashExtra(extra),
   );
 }
