@@ -6,8 +6,11 @@ import '../models/story_group_model.dart';
 import '../models/story_item_model.dart';
 import '../overlays/story_overlay.dart';
 import 'story_overlay_renderer.dart';
+import 'story_shared_content_card.dart';
 
+export '../models/story_shared_content.dart';
 export '../overlays/story_overlay.dart' show OnOverlayInteraction;
+export 'story_shared_content_card.dart';
 
 /// Controller for explicitly pausing or resuming story playback.
 class StoryKitViewerController {
@@ -37,6 +40,9 @@ class StoryKitViewer extends StatefulWidget {
   final ValueChanged<String>? onGroupViewed;
   final VoidCallback? onViewerFinished;
   final Widget Function(BuildContext, StoryGroupModel)? headerBuilder;
+  final void Function(StorySharedContent content)? onSharedContentTap;
+  final Widget Function(BuildContext context, StorySharedContent content)?
+  sharedContentCardBuilder;
 
   const StoryKitViewer({
     super.key,
@@ -49,6 +55,8 @@ class StoryKitViewer extends StatefulWidget {
     this.onGroupViewed,
     this.onViewerFinished,
     this.headerBuilder,
+    this.onSharedContentTap,
+    this.sharedContentCardBuilder,
   });
 
   @override
@@ -407,6 +415,23 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                       child: const SizedBox.expand(),
                     ),
                   ),
+                  if (item.sharedContent != null)
+                    Center(
+                      child:
+                          widget.sharedContentCardBuilder?.call(
+                            context,
+                            item.sharedContent!,
+                          ) ??
+                          StorySharedContentCard(
+                            content: item.sharedContent!,
+                            onTap: () {
+                              _setPaused(true);
+                              widget.onSharedContentTap?.call(
+                                item.sharedContent!,
+                              );
+                            },
+                          ),
+                    ),
                   StoryOverlayRenderer(
                     overlays: item.overlays,
                     onOverlayInteraction: widget.onOverlayInteraction,
