@@ -20,7 +20,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cached_network_image: ^3.4.1
+  cached_network_image: ">=3.4.1 <5.0.0"
   video_player: ^2.9.2
 
 # story_editor_pro (capture/editing UI) stays a direct dependency of the host
