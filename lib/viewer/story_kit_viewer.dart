@@ -6,8 +6,11 @@ import '../models/story_group_model.dart';
 import '../models/story_item_model.dart';
 import '../overlays/story_overlay.dart';
 import 'story_overlay_renderer.dart';
+import 'story_shared_content_card.dart';
 
+export '../models/story_shared_content.dart';
 export '../overlays/story_overlay.dart' show OnOverlayInteraction;
+export 'story_shared_content_card.dart';
 
 /// Controller for explicitly pausing or resuming story playback.
 class StoryKitViewerController {
@@ -37,6 +40,22 @@ class StoryKitViewer extends StatefulWidget {
   final ValueChanged<String>? onGroupViewed;
   final VoidCallback? onViewerFinished;
   final Widget Function(BuildContext, StoryGroupModel)? headerBuilder;
+  final Widget Function(
+    BuildContext context,
+    StoryGroupModel group,
+    StoryItemModel item,
+  )?
+  itemHeaderBuilder;
+  final Widget Function(
+    BuildContext context,
+    StoryGroupModel group,
+    StoryItemModel item,
+  )?
+  footerBuilder;
+  final void Function(int groupIndex, int itemIndex)? onItemChanged;
+  final void Function(StorySharedContent content)? onSharedContentTap;
+  final Widget Function(BuildContext context, StorySharedContent content)?
+  sharedContentCardBuilder;
 
   const StoryKitViewer({
     super.key,
@@ -49,6 +68,11 @@ class StoryKitViewer extends StatefulWidget {
     this.onGroupViewed,
     this.onViewerFinished,
     this.headerBuilder,
+    this.itemHeaderBuilder,
+    this.footerBuilder,
+    this.onItemChanged,
+    this.onSharedContentTap,
+    this.sharedContentCardBuilder,
   });
 
   @override
@@ -204,6 +228,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
       if (!_paused && !_lifecyclePaused) _progress.forward();
     }
     if (mounted) setState(() {});
+    widget.onItemChanged?.call(_groupIndex, _itemIndex);
   }
 
   Future<void> _loadVideo() async {
@@ -404,9 +429,33 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                           setState(() => _chromeHidden = false);
                         }
                       },
+                      onVerticalDragEnd: (details) {
+                        if (details.primaryVelocity != null &&
+                            details.primaryVelocity! > 250) {
+                          widget.onViewerFinished?.call();
+                          Navigator.of(context).maybePop();
+                        }
+                      },
                       child: const SizedBox.expand(),
                     ),
                   ),
+                  if (item.sharedContent != null)
+                    Center(
+                      child:
+                          widget.sharedContentCardBuilder?.call(
+                            context,
+                            item.sharedContent!,
+                          ) ??
+                          StorySharedContentCard(
+                            content: item.sharedContent!,
+                            onTap: () {
+                              _setPaused(true);
+                              widget.onSharedContentTap?.call(
+                                item.sharedContent!,
+                              );
+                            },
+                          ),
+                    ),
                   StoryOverlayRenderer(
                     overlays: item.overlays,
                     onOverlayInteraction: widget.onOverlayInteraction,
@@ -415,6 +464,28 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                 ],
               );
             },
+          ),
+
+          // Top gradient overlay for header readability.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 140,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withValues(alpha: 0.75),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ),
           ),
 
           // Progress segments across the current group's items. The
@@ -466,6 +537,7 @@ class _StoryKitViewerState extends State<StoryKitViewer>
               opacity: _chromeHidden ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 250),
               child:
+                  widget.itemHeaderBuilder?.call(context, _group, _item) ??
                   widget.headerBuilder?.call(context, _group) ??
                   Row(
                     children: [
@@ -488,6 +560,43 @@ class _StoryKitViewerState extends State<StoryKitViewer>
                   ),
             ),
           ),
+
+          // Bottom gradient overlay for interaction and footer readability.
+          if (widget.footerBuilder != null ||
+              (_item.caption != null && _item.caption!.isNotEmpty))
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 180,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.85),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Footer (host-provided).
+          if (widget.footerBuilder != null)
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + 10,
+              left: 12,
+              right: 12,
+              child: AnimatedOpacity(
+                opacity: _chromeHidden ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 250),
+                child: widget.footerBuilder!(context, _group, _item),
+              ),
+            ),
         ],
       ),
     );

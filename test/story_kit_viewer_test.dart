@@ -221,5 +221,154 @@ void main() {
       expect(viewedGroups, ['u1']);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('renders StorySharedContentCard and fires onSharedContentTap', (
+      tester,
+    ) async {
+      StorySharedContent? tappedContent;
+      const sharedContent = StorySharedContent(
+        id: 'shared_video_1',
+        type: StoryKitContentType.shortVideo,
+        title: 'Epic Short Video',
+        authorUsername: 'creator_one',
+        badgeText: 'SHORT',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoryKitViewer(
+            groups: const [
+              StoryGroupModel(
+                userId: 'u1',
+                username: 'alice',
+                items: [
+                  StoryItemModel(
+                    id: 'first',
+                    mediaUrl: 'https://example.com/first.jpg',
+                    type: StoryItemType.image,
+                    sharedContent: sharedContent,
+                  ),
+                  StoryItemModel(
+                    id: 'second',
+                    mediaUrl: 'https://example.com/second.jpg',
+                    type: StoryItemType.image,
+                  ),
+                ],
+              ),
+            ],
+            onSharedContentTap: (content) => tappedContent = content,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Card is rendered on screen
+      expect(find.byType(StorySharedContentCard), findsOneWidget);
+      expect(find.text('Epic Short Video'), findsOneWidget);
+      expect(find.text('@creator_one'), findsOneWidget);
+
+      // Tap card
+      await tester.tap(find.byType(StorySharedContentCard));
+      await tester.pump();
+
+      expect(tappedContent, isNotNull);
+      expect(tappedContent!.id, 'shared_video_1');
+      expect(tappedContent!.type, StoryKitContentType.shortVideo);
+
+      // Verify that story did NOT advance to second item
+      expect(find.text('Epic Short Video'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('uses custom sharedContentCardBuilder when provided', (
+      tester,
+    ) async {
+      const sharedContent = StorySharedContent(
+        id: 'shared_note_1',
+        type: StoryKitContentType.note,
+        title: 'Custom Note Card',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoryKitViewer(
+            groups: const [
+              StoryGroupModel(
+                userId: 'u1',
+                username: 'alice',
+                items: [
+                  StoryItemModel(
+                    id: 'first',
+                    mediaUrl: 'https://example.com/first.jpg',
+                    type: StoryItemType.image,
+                    sharedContent: sharedContent,
+                  ),
+                ],
+              ),
+            ],
+            sharedContentCardBuilder:
+                (context, content) => Container(
+                  key: const Key('custom_shared_card'),
+                  child: Text('Custom: ${content.title}'),
+                ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('custom_shared_card')), findsOneWidget);
+      expect(find.text('Custom: Custom Note Card'), findsOneWidget);
+    });
+
+    testWidgets(
+      'renders itemHeaderBuilder and footerBuilder with active item',
+      (tester) async {
+        int changedGroup = -1;
+        int changedItem = -1;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StoryKitViewer(
+              groups: const [
+                StoryGroupModel(
+                  userId: 'u1',
+                  username: 'alice',
+                  items: [
+                    StoryItemModel(
+                      id: 'first',
+                      mediaUrl: 'https://example.com/first.jpg',
+                      type: StoryItemType.image,
+                      caption: 'Hello caption',
+                    ),
+                  ],
+                ),
+              ],
+              onItemChanged: (g, i) {
+                changedGroup = g;
+                changedItem = i;
+              },
+              itemHeaderBuilder:
+                  (context, group, item) => Container(
+                    key: const Key('custom_item_header'),
+                    child: Text('${group.username}:${item.caption}'),
+                  ),
+              footerBuilder:
+                  (context, group, item) => Container(
+                    key: const Key('custom_footer'),
+                    child: Text('Footer for ${item.id}'),
+                  ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byKey(const Key('custom_item_header')), findsOneWidget);
+        expect(find.text('alice:Hello caption'), findsOneWidget);
+        expect(find.byKey(const Key('custom_footer')), findsOneWidget);
+        expect(find.text('Footer for first'), findsOneWidget);
+        expect(changedGroup, 0);
+        expect(changedItem, 0);
+      },
+    );
   });
 }
