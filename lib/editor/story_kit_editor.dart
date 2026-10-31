@@ -14,6 +14,9 @@ import '../theme/story_kit_theme.dart';
 import 'canvas/story_editor_canvas.dart';
 import 'canvas/story_page_strip.dart';
 import 'editor_controller.dart';
+import 'panels/animation_picker_sheet.dart';
+import 'panels/audio_settings_sheet.dart';
+import 'panels/cover_picker_sheet.dart';
 import 'panels/drawing_toolbar.dart';
 import 'panels/image_adjustment_sheet.dart';
 import 'panels/layer_manager_sheet.dart';
@@ -21,6 +24,7 @@ import 'panels/rich_text_editor_sheet.dart';
 import 'panels/shape_picker_sheet.dart';
 import 'panels/sticker_picker_sheet.dart';
 import 'panels/template_picker_sheet.dart';
+import 'panels/timeline_scrubber.dart';
 
 /// Configuration options for the [StoryKitEditor] UI.
 @immutable
@@ -36,6 +40,9 @@ class StoryKitEditorConfig {
     this.enableAdjustments = true,
     this.enableStickers = true,
     this.enableGradients = true,
+    this.enableTimeline = true,
+    this.enableAnimation = true,
+    this.enableAudioSettings = true,
     this.theme = StoryKitEditorTheme.dark,
     this.strings = const StoryKitStrings(),
     this.assetProvider = const DefaultStoryAssetProvider(),
@@ -62,6 +69,9 @@ class StoryKitEditorConfig {
   final bool enableAdjustments;
   final bool enableStickers;
   final bool enableGradients;
+  final bool enableTimeline;
+  final bool enableAnimation;
+  final bool enableAudioSettings;
   final StoryKitEditorTheme theme;
   final StoryKitStrings strings;
   final StoryAssetProvider assetProvider;
@@ -184,6 +194,21 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
                     else
                       _buildTopBar(context),
                     Expanded(child: StoryEditorCanvas(controller: _controller)),
+                    if (widget.config.enableTimeline &&
+                        _controller.state.showTimeline &&
+                        !isDrawing)
+                      TimelineScrubber(
+                        controller: _controller,
+                        onOpenAnimationSheet:
+                            widget.config.enableAnimation
+                                ? () => _openAnimationSheet(context)
+                                : null,
+                        onOpenAudioSheet:
+                            widget.config.enableAudioSettings
+                                ? () => _openAudioSheet(context)
+                                : null,
+                        onOpenCoverSheet: () => _openCoverSheet(context),
+                      ),
                     if (widget.config.enablePageStrip &&
                         _controller.state.showPageStrip &&
                         !isDrawing)
@@ -359,6 +384,20 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
                       onPressed: _controller.togglePageStrip,
                     ),
 
+                  // Toggle Timeline
+                  if (widget.config.enableTimeline)
+                    IconButton(
+                      icon: Icon(
+                        Icons.movie_filter_outlined,
+                        color:
+                            _controller.state.showTimeline
+                                ? theme.accentColor
+                                : theme.secondaryIconColor,
+                      ),
+                      tooltip: strings.timeline,
+                      onPressed: _controller.toggleTimeline,
+                    ),
+
                   // Save Draft
                   if (widget.config.enableDrafts)
                     IconButton(
@@ -448,6 +487,33 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => LayerManagerSheet(controller: _controller),
+    );
+  }
+
+  void _openAnimationSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AnimationPickerSheet(controller: _controller),
+    );
+  }
+
+  void _openAudioSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AudioSettingsSheet(controller: _controller),
+    );
+  }
+
+  void _openCoverSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CoverPickerSheet(controller: _controller),
     );
   }
 

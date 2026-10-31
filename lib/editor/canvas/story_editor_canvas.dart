@@ -1,11 +1,16 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../../models/element_payloads.dart';
 import '../../models/story_element.dart';
 import '../../models/story_media_asset.dart';
+import '../../models/story_page.dart';
 import '../../models/story_transform.dart';
+import '../../models/video_payload.dart';
 import '../editor_controller.dart';
+import 'animated_element_box.dart';
 import 'canvas_element_view.dart';
+import 'canvas_video_view.dart';
 import 'drawing_canvas_overlay.dart';
 import 'selection_overlay.dart';
 import 'snapping_guidelines.dart';
@@ -70,7 +75,7 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
                         children: [
                           // 1. Background asset if present
                           if (page.backgroundAsset != null)
-                            _buildBackground(page.backgroundAsset!),
+                            _buildBackground(page.backgroundAsset!, page),
 
                           // 2. Elements rendered in deterministic z-order
                           for (final el in page.sortedElements)
@@ -114,7 +119,25 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
     );
   }
 
-  Widget _buildBackground(StoryMediaAsset asset) {
+  Widget _buildBackground(StoryMediaAsset asset, StoryPage page) {
+    final isVideo =
+        asset.mimeType?.contains('video') == true ||
+        asset.uri.toLowerCase().endsWith('.mp4') ||
+        asset.uri.toLowerCase().endsWith('.mov');
+
+    if (isVideo) {
+      final videoPayload = StoryVideoPayload(
+        asset: asset,
+        trimRange: page.videoTrimRange ?? VideoTrimRange(end: page.duration),
+        audioPolicy: page.audioPolicy ?? const VideoAudioPolicy(),
+        coverTimestamp: page.coverTimestamp,
+      );
+      return CanvasVideoView(
+        videoPayload: videoPayload,
+        timelineController: widget.controller.timelineController,
+      );
+    }
+
     switch (asset.sourceType) {
       case StoryMediaSourceType.file:
         return Image.file(
@@ -155,7 +178,15 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
       height: size.height,
       child: Transform.rotate(
         angle: transform.rotation,
-        child: CanvasElementView(element: element),
+        child: AnimatedElementBox(
+          element: element,
+          canvasSize: canvasSize,
+          timelineController: widget.controller.timelineController,
+          child: CanvasElementView(
+            element: element,
+            timelineController: widget.controller.timelineController,
+          ),
+        ),
       ),
     );
   }
@@ -186,10 +217,13 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
     if (widget.controller.state.isDrawingMode) return;
     final point = details.localPosition;
     final elements = widget.controller.activePage.sortedElements.reversed;
+    final currentTime = widget.controller.timelineController.currentPosition;
 
     for (final el in elements) {
+      final inTimeRange = el.visibleTimeRange?.isVisibleAt(currentTime) ?? true;
       if (!el.isLocked &&
           el.isVisible &&
+          inTimeRange &&
           el.transform.containsPoint(point, canvasSize)) {
         widget.controller.selectElement(el.id);
         return;
@@ -204,17 +238,24 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
     if (widget.controller.state.isDrawingMode) return;
     final point = details.localFocalPoint;
     final selected = widget.controller.selectedElement;
+    final currentTime = widget.controller.timelineController.currentPosition;
 
     // Check if touching current selected element or another selectable element
     String? targetId = selected?.id;
+    final selectedInTimeRange =
+        selected?.visibleTimeRange?.isVisibleAt(currentTime) ?? true;
     if (selected == null ||
         selected.isLocked ||
         !selected.isVisible ||
+        !selectedInTimeRange ||
         !selected.transform.containsPoint(point, canvasSize)) {
       final elements = widget.controller.activePage.sortedElements.reversed;
       for (final el in elements) {
+        final inTimeRange =
+            el.visibleTimeRange?.isVisibleAt(currentTime) ?? true;
         if (!el.isLocked &&
             el.isVisible &&
+            inTimeRange &&
             el.transform.containsPoint(point, canvasSize)) {
           targetId = el.id;
           widget.controller.selectElement(el.id);

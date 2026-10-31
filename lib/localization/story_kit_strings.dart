@@ -25,6 +25,7 @@ class StoryKitStrings {
     this.exportingStory = 'Exporting story...',
     this.solidColors = 'Solid Colors',
     this.gradients = 'Gradients',
+    this.timeline = 'Timeline',
     this.delete = 'Delete',
     this.bringForward = 'Bring Forward',
     this.sendBackward = 'Send Backward',
@@ -48,6 +49,7 @@ class StoryKitStrings {
   final String exportingStory;
   final String solidColors;
   final String gradients;
+  final String timeline;
   final String delete;
   final String bringForward;
   final String sendBackward;
@@ -71,6 +73,7 @@ class StoryKitStrings {
           layers == other.layers &&
           templates == other.templates &&
           togglePageStrip == other.togglePageStrip &&
+          timeline == other.timeline &&
           saveDraft == other.saveDraft &&
           draftSaved == other.draftSaved &&
           export == other.export &&
@@ -90,6 +93,7 @@ class StoryKitStrings {
     layers,
     templates,
     togglePageStrip,
+    timeline,
     saveDraft,
     draftSaved,
     export,

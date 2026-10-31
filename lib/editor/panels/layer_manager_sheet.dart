@@ -209,6 +209,8 @@ class LayerManagerSheet extends StatelessWidget {
         return Icons.gesture;
       case StoryElementType.shape:
         return Icons.category;
+      case StoryElementType.video:
+        return Icons.videocam;
       case StoryElementType.unknown:
         return Icons.help_outline;
     }
@@ -227,6 +229,8 @@ class LayerManagerSheet extends StatelessWidget {
       return 'Card: ${payload.sharedContent.title}';
     } else if (payload is DrawingElementPayload) {
       return 'Drawing (${payload.strokes.length} strokes)';
+    } else if (payload is VideoElementPayload) {
+      return 'Video Layer';
     } else if (payload is ImageElementPayload) {
       return 'Image Layer';
     }

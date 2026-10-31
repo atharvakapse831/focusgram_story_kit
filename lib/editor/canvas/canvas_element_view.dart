@@ -5,13 +5,20 @@ import 'package:flutter/material.dart';
 import '../../models/element_payloads.dart';
 import '../../models/story_element.dart';
 import '../../models/story_media_asset.dart';
+import '../../timeline/timeline_controller.dart';
 import '../../viewer/story_shared_content_card.dart';
+import 'canvas_video_view.dart';
 
 /// Renders the visual representation of a [StoryElement] based on its payload.
 class CanvasElementView extends StatelessWidget {
-  const CanvasElementView({super.key, required this.element});
+  const CanvasElementView({
+    super.key,
+    required this.element,
+    this.timelineController,
+  });
 
   final StoryElement element;
+  final StoryTimelineController? timelineController;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +39,8 @@ class CanvasElementView extends StatelessWidget {
       content = _buildDrawing(payload);
     } else if (payload is ShapeElementPayload) {
       content = _buildShape(payload);
+    } else if (payload is VideoElementPayload) {
+      content = _buildVideo(payload);
     } else {
       content = _buildUnknown(payload);
     }
@@ -41,6 +50,13 @@ class CanvasElementView extends StatelessWidget {
     }
 
     return content;
+  }
+
+  Widget _buildVideo(VideoElementPayload payload) {
+    return CanvasVideoView(
+      videoPayload: payload.video,
+      timelineController: timelineController,
+    );
   }
 
   Widget _buildText(TextElementPayload textPayload) {
