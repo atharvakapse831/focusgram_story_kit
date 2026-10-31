@@ -8,6 +8,8 @@ enum StoryElementType {
   image,
   sticker,
   card,
+  drawing,
+  shape,
   unknown;
 
   static StoryElementType fromString(String? raw) {
@@ -21,6 +23,10 @@ enum StoryElementType {
         return StoryElementType.sticker;
       case 'card':
         return StoryElementType.card;
+      case 'drawing':
+        return StoryElementType.drawing;
+      case 'shape':
+        return StoryElementType.shape;
       default:
         return StoryElementType.unknown;
     }

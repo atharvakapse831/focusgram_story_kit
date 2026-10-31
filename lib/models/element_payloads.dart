@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'drawing_stroke.dart';
+import 'image_adjustments.dart';
+import 'shape_payload.dart';
 import 'story_media_asset.dart';
 import 'story_shared_content.dart';
+
+export 'drawing_stroke.dart';
+export 'image_adjustments.dart';
+export 'shape_payload.dart';
 
 /// Base contract for payload data attached to a [StoryElement].
 @immutable
@@ -27,13 +34,17 @@ abstract class StoryElementPayload {
         return StickerElementPayload.fromJson(json);
       case 'card':
         return CardElementPayload.fromJson(json);
+      case 'drawing':
+        return DrawingElementPayload.fromJson(json);
+      case 'shape':
+        return ShapeElementPayload.fromJson(json);
       default:
         return UnknownElementPayload(rawType: discriminator, rawData: json);
     }
   }
 }
 
-/// Payload for rich text story elements.
+/// Payload for rich text story elements with typography, outline, and drop shadows.
 @immutable
 class TextElementPayload extends StoryElementPayload {
   const TextElementPayload({
@@ -45,6 +56,14 @@ class TextElementPayload extends StoryElementPayload {
     this.isBold = false,
     this.isItalic = false,
     this.fontFamily,
+    this.outlineColor,
+    this.outlineWidth = 0.0,
+    this.shadowColor,
+    this.shadowBlurRadius = 0.0,
+    this.shadowOffsetX = 0.0,
+    this.shadowOffsetY = 0.0,
+    this.lineSpacing,
+    this.letterSpacing,
   });
 
   final String text;
@@ -56,6 +75,16 @@ class TextElementPayload extends StoryElementPayload {
   final bool isItalic;
   final String? fontFamily;
 
+  // Phase 4 Typography Additions
+  final Color? outlineColor;
+  final double outlineWidth;
+  final Color? shadowColor;
+  final double shadowBlurRadius;
+  final double shadowOffsetX;
+  final double shadowOffsetY;
+  final double? lineSpacing;
+  final double? letterSpacing;
+
   @override
   String get typeDiscriminator => 'text';
 
@@ -64,20 +93,42 @@ class TextElementPayload extends StoryElementPayload {
     double? fontSize,
     Color? textColor,
     Color? backgroundColor,
+    bool clearBackgroundColor = false,
     TextAlign? textAlign,
     bool? isBold,
     bool? isItalic,
     String? fontFamily,
+    Color? outlineColor,
+    bool clearOutline = false,
+    double? outlineWidth,
+    Color? shadowColor,
+    bool clearShadow = false,
+    double? shadowBlurRadius,
+    double? shadowOffsetX,
+    double? shadowOffsetY,
+    double? lineSpacing,
+    double? letterSpacing,
   }) {
     return TextElementPayload(
       text: text ?? this.text,
       fontSize: fontSize ?? this.fontSize,
       textColor: textColor ?? this.textColor,
-      backgroundColor: backgroundColor ?? this.backgroundColor,
+      backgroundColor:
+          clearBackgroundColor
+              ? null
+              : (backgroundColor ?? this.backgroundColor),
       textAlign: textAlign ?? this.textAlign,
       isBold: isBold ?? this.isBold,
       isItalic: isItalic ?? this.isItalic,
       fontFamily: fontFamily ?? this.fontFamily,
+      outlineColor: clearOutline ? null : (outlineColor ?? this.outlineColor),
+      outlineWidth: outlineWidth ?? this.outlineWidth,
+      shadowColor: clearShadow ? null : (shadowColor ?? this.shadowColor),
+      shadowBlurRadius: shadowBlurRadius ?? this.shadowBlurRadius,
+      shadowOffsetX: shadowOffsetX ?? this.shadowOffsetX,
+      shadowOffsetY: shadowOffsetY ?? this.shadowOffsetY,
+      lineSpacing: lineSpacing ?? this.lineSpacing,
+      letterSpacing: letterSpacing ?? this.letterSpacing,
     );
   }
 
@@ -91,6 +142,14 @@ class TextElementPayload extends StoryElementPayload {
     'isBold': isBold,
     'isItalic': isItalic,
     if (fontFamily != null) 'fontFamily': fontFamily,
+    if (outlineColor != null) 'outlineColor': outlineColor!.toARGB32(),
+    if (outlineWidth > 0.0) 'outlineWidth': outlineWidth,
+    if (shadowColor != null) 'shadowColor': shadowColor!.toARGB32(),
+    if (shadowBlurRadius > 0.0) 'shadowBlurRadius': shadowBlurRadius,
+    if (shadowOffsetX != 0.0) 'shadowOffsetX': shadowOffsetX,
+    if (shadowOffsetY != 0.0) 'shadowOffsetY': shadowOffsetY,
+    if (lineSpacing != null) 'lineSpacing': lineSpacing,
+    if (letterSpacing != null) 'letterSpacing': letterSpacing,
   };
 
   factory TextElementPayload.fromJson(Map<String, dynamic> json) {
@@ -112,6 +171,20 @@ class TextElementPayload extends StoryElementPayload {
       isBold: json['isBold'] as bool? ?? false,
       isItalic: json['isItalic'] as bool? ?? false,
       fontFamily: json['fontFamily'] as String?,
+      outlineColor:
+          json['outlineColor'] != null
+              ? Color(json['outlineColor'] as int)
+              : null,
+      outlineWidth: (json['outlineWidth'] as num?)?.toDouble() ?? 0.0,
+      shadowColor:
+          json['shadowColor'] != null
+              ? Color(json['shadowColor'] as int)
+              : null,
+      shadowBlurRadius: (json['shadowBlurRadius'] as num?)?.toDouble() ?? 0.0,
+      shadowOffsetX: (json['shadowOffsetX'] as num?)?.toDouble() ?? 0.0,
+      shadowOffsetY: (json['shadowOffsetY'] as num?)?.toDouble() ?? 0.0,
+      lineSpacing: (json['lineSpacing'] as num?)?.toDouble(),
+      letterSpacing: (json['letterSpacing'] as num?)?.toDouble(),
     );
   }
 
@@ -119,15 +192,22 @@ class TextElementPayload extends StoryElementPayload {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is TextElementPayload &&
-          runtimeType == other.runtimeType &&
           text == other.text &&
           fontSize == other.fontSize &&
-          textColor == other.textColor &&
-          backgroundColor == other.backgroundColor &&
+          textColor.toARGB32() == other.textColor.toARGB32() &&
+          backgroundColor?.toARGB32() == other.backgroundColor?.toARGB32() &&
           textAlign == other.textAlign &&
           isBold == other.isBold &&
           isItalic == other.isItalic &&
-          fontFamily == other.fontFamily;
+          fontFamily == other.fontFamily &&
+          outlineColor?.toARGB32() == other.outlineColor?.toARGB32() &&
+          outlineWidth == other.outlineWidth &&
+          shadowColor?.toARGB32() == other.shadowColor?.toARGB32() &&
+          shadowBlurRadius == other.shadowBlurRadius &&
+          shadowOffsetX == other.shadowOffsetX &&
+          shadowOffsetY == other.shadowOffsetY &&
+          lineSpacing == other.lineSpacing &&
+          letterSpacing == other.letterSpacing;
 
   @override
   int get hashCode => Object.hash(
@@ -139,29 +219,51 @@ class TextElementPayload extends StoryElementPayload {
     isBold,
     isItalic,
     fontFamily,
+    outlineColor,
+    outlineWidth,
+    shadowColor,
+    shadowBlurRadius,
+    shadowOffsetX,
+    shadowOffsetY,
+    lineSpacing,
+    letterSpacing,
   );
 }
 
-/// Payload for image layers (imported photos, stickers from local or remote assets).
+/// Payload for image layers with non-destructive adjustments and filters.
 @immutable
 class ImageElementPayload extends StoryElementPayload {
-  const ImageElementPayload({required this.asset, this.fit = BoxFit.contain});
+  const ImageElementPayload({
+    required this.asset,
+    this.fit = BoxFit.contain,
+    this.adjustments = ImageAdjustments.identity,
+  });
 
   final StoryMediaAsset asset;
   final BoxFit fit;
+  final ImageAdjustments adjustments;
 
   @override
   String get typeDiscriminator => 'image';
 
-  ImageElementPayload copyWith({StoryMediaAsset? asset, BoxFit? fit}) {
+  ImageElementPayload copyWith({
+    StoryMediaAsset? asset,
+    BoxFit? fit,
+    ImageAdjustments? adjustments,
+  }) {
     return ImageElementPayload(
       asset: asset ?? this.asset,
       fit: fit ?? this.fit,
+      adjustments: adjustments ?? this.adjustments,
     );
   }
 
   @override
-  Map<String, dynamic> toJson() => {'asset': asset.toJson(), 'fit': fit.name};
+  Map<String, dynamic> toJson() => {
+    'asset': asset.toJson(),
+    'fit': fit.name,
+    'adjustments': adjustments.toJson(),
+  };
 
   factory ImageElementPayload.fromJson(Map<String, dynamic> json) {
     return ImageElementPayload(
@@ -172,6 +274,12 @@ class ImageElementPayload extends StoryElementPayload {
         (e) => e.name == json['fit'],
         orElse: () => BoxFit.contain,
       ),
+      adjustments:
+          json['adjustments'] != null
+              ? ImageAdjustments.fromJson(
+                Map<String, dynamic>.from(json['adjustments'] as Map),
+              )
+              : ImageAdjustments.identity,
     );
   }
 
@@ -181,10 +289,11 @@ class ImageElementPayload extends StoryElementPayload {
       other is ImageElementPayload &&
           runtimeType == other.runtimeType &&
           asset == other.asset &&
-          fit == other.fit;
+          fit == other.fit &&
+          adjustments == other.adjustments;
 
   @override
-  int get hashCode => Object.hash(asset, fit);
+  int get hashCode => Object.hash(asset, fit, adjustments);
 }
 
 /// Payload for static/emoji/clipart stickers.
@@ -279,6 +388,56 @@ class CardElementPayload extends StoryElementPayload {
 
   @override
   int get hashCode => sharedContent.hashCode;
+}
+
+/// Payload for freehand drawings containing ordered strokes.
+@immutable
+class DrawingElementPayload extends StoryElementPayload {
+  const DrawingElementPayload({this.strokes = const []});
+
+  final List<DrawingStroke> strokes;
+
+  @override
+  String get typeDiscriminator => 'drawing';
+
+  DrawingElementPayload copyWith({List<DrawingStroke>? strokes}) {
+    return DrawingElementPayload(strokes: strokes ?? this.strokes);
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'strokes': strokes.map((s) => s.toJson()).toList(),
+  };
+
+  factory DrawingElementPayload.fromJson(Map<String, dynamic> json) {
+    return DrawingElementPayload(
+      strokes:
+          (json['strokes'] as List<dynamic>? ?? [])
+              .map(
+                (s) =>
+                    DrawingStroke.fromJson(Map<String, dynamic>.from(s as Map)),
+              )
+              .toList(),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DrawingElementPayload &&
+          runtimeType == other.runtimeType &&
+          _listEquals(strokes, other.strokes);
+
+  static bool _listEquals(List<DrawingStroke> a, List<DrawingStroke> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(strokes);
 }
 
 /// Fallback payload for unknown or forward-compatible element types.

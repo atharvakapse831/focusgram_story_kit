@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/element_payloads.dart';
+import '../models/gradient_background.dart';
 import '../models/story_element.dart';
 import '../models/story_media_asset.dart';
 import '../models/story_page.dart';
 import '../models/story_project.dart';
+import '../models/story_template.dart';
 import '../models/story_transform.dart';
 import 'command_history.dart';
 import 'editor_commands.dart';
@@ -92,6 +94,11 @@ class EditorController extends ChangeNotifier {
     if (_state.activeTool == tool) return;
     _state = _state.copyWith(activeTool: tool);
     notifyListeners();
+  }
+
+  /// Sets or exits freehand drawing mode.
+  void setDrawingMode(bool enabled) {
+    setTool(enabled ? EditorTool.draw : EditorTool.select);
   }
 
   /// Toggles visibility of the bottom page strip.
@@ -297,6 +304,107 @@ class EditorController extends ChangeNotifier {
         newAsset: clearAsset ? null : (asset ?? current.backgroundAsset),
       ),
     );
+  }
+
+  /// Sets or clears the gradient background for the active page.
+  void setPageGradient(StoryGradientBackground? gradient) {
+    final current = activePage;
+    execute(
+      SetPageGradientCommand(
+        pageId: current.id,
+        previousGradient: current.backgroundGradient,
+        newGradient: gradient,
+      ),
+    );
+  }
+
+  /// Toggles the lock flag on an element.
+  void toggleElementLock(String elementId) {
+    execute(
+      ToggleElementLockCommand(pageId: activePage.id, elementId: elementId),
+    );
+  }
+
+  /// Toggles visibility of an element on the canvas.
+  void toggleElementVisibility(String elementId) {
+    execute(
+      ToggleElementVisibilityCommand(
+        pageId: activePage.id,
+        elementId: elementId,
+      ),
+    );
+  }
+
+  /// Appends a freehand stroke to the active page's drawing layer.
+  void addDrawingStroke(DrawingStroke stroke) {
+    execute(AddDrawingStrokeCommand(pageId: activePage.id, stroke: stroke));
+  }
+
+  /// Clears all strokes on the active page's drawing layer.
+  void clearDrawing(String drawingElementId) {
+    final el = activePage.getElement(drawingElementId);
+    if (el == null || el.payload is! DrawingElementPayload) return;
+    final payload = el.payload as DrawingElementPayload;
+    execute(
+      ClearDrawingCommand(
+        pageId: activePage.id,
+        drawingElementId: drawingElementId,
+        previousStrokes: payload.strokes,
+      ),
+    );
+  }
+
+  /// Updates image adjustments (brightness, contrast, saturation, filters).
+  void updateImageAdjustments(
+    String elementId,
+    ImageAdjustments newAdjustments,
+  ) {
+    final el = activePage.getElement(elementId);
+    if (el == null || el.payload is! ImageElementPayload) return;
+    final payload = el.payload as ImageElementPayload;
+    execute(
+      UpdateImageAdjustmentsCommand(
+        pageId: activePage.id,
+        elementId: elementId,
+        previousAdjustments: payload.adjustments,
+        newAdjustments: newAdjustments,
+      ),
+    );
+  }
+
+  /// Applies a preset template to replace the active page layout.
+  void applyTemplate(StoryTemplate template) {
+    final current = activePage;
+    final templated = template.createPage(current.id);
+    execute(
+      ApplyTemplateCommand(previousPage: current, templatedPage: templated),
+    );
+  }
+
+  /// Updates transient alignment snap guideline indicators.
+  void setSnapGuidelines({double? snapX, double? snapY}) {
+    if (_state.snapX == snapX && _state.snapY == snapY) return;
+    _state = _state.copyWith(
+      snapX: snapX,
+      clearSnapX: snapX == null,
+      snapY: snapY,
+      clearSnapY: snapY == null,
+    );
+    notifyListeners();
+  }
+
+  /// Updates transient brush configuration for drawing mode.
+  void setBrushSettings({
+    DrawingBrushType? brushType,
+    Color? brushColor,
+    double? brushWidth,
+  }) {
+    _state = _state.copyWith(
+      activeBrushType: brushType,
+      activeBrushColor: brushColor,
+      activeBrushWidth: brushWidth,
+    );
+    notifyListeners();
   }
 
   // ---------------------------------------------------------------------------

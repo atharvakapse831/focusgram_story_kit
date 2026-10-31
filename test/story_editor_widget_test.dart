@@ -45,6 +45,8 @@ void main() {
       // Tap Add Sticker
       await tester.tap(find.byTooltip('Add Sticker'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('🔥').first);
+      await tester.pumpAndSettle();
 
       expect(controller.activePage.elements.length, equals(1));
       expect(
@@ -107,6 +109,8 @@ void main() {
 
       // Add a sticker
       await tester.tap(find.byTooltip('Add Sticker'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('🔥').first);
       await tester.pumpAndSettle();
 
       expect(controller.canUndo, isTrue);
