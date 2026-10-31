@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'gradient_background.dart';
 import 'story_element.dart';
 import 'story_media_asset.dart';
+import 'video_payload.dart';
 
 /// Represents a single slide or screen within a multi-page story project.
 @immutable
@@ -13,6 +14,9 @@ class StoryPage {
     this.backgroundColor = Colors.black,
     this.backgroundGradient,
     this.backgroundAsset,
+    this.videoTrimRange,
+    this.audioPolicy,
+    this.coverTimestamp,
     this.elements = const [],
   });
 
@@ -30,6 +34,15 @@ class StoryPage {
 
   /// Optional background image/asset.
   final StoryMediaAsset? backgroundAsset;
+
+  /// Optional trim boundaries for background video.
+  final VideoTrimRange? videoTrimRange;
+
+  /// Optional audio policy for background video or soundtrack.
+  final VideoAudioPolicy? audioPolicy;
+
+  /// Timestamp selected for video cover thumbnail.
+  final Duration? coverTimestamp;
 
   /// Visual elements stacked on this page, ordered by increasing zIndex.
   final List<StoryElement> elements;
@@ -57,6 +70,12 @@ class StoryPage {
     bool clearBackgroundGradient = false,
     StoryMediaAsset? backgroundAsset,
     bool clearBackgroundAsset = false,
+    VideoTrimRange? videoTrimRange,
+    bool clearVideoTrimRange = false,
+    VideoAudioPolicy? audioPolicy,
+    bool clearAudioPolicy = false,
+    Duration? coverTimestamp,
+    bool clearCoverTimestamp = false,
     List<StoryElement>? elements,
   }) {
     return StoryPage(
@@ -71,6 +90,11 @@ class StoryPage {
           clearBackgroundAsset
               ? null
               : (backgroundAsset ?? this.backgroundAsset),
+      videoTrimRange:
+          clearVideoTrimRange ? null : (videoTrimRange ?? this.videoTrimRange),
+      audioPolicy: clearAudioPolicy ? null : (audioPolicy ?? this.audioPolicy),
+      coverTimestamp:
+          clearCoverTimestamp ? null : (coverTimestamp ?? this.coverTimestamp),
       elements: elements ?? this.elements,
     );
   }
@@ -82,6 +106,10 @@ class StoryPage {
     if (backgroundGradient != null)
       'backgroundGradient': backgroundGradient!.toJson(),
     if (backgroundAsset != null) 'backgroundAsset': backgroundAsset!.toJson(),
+    if (videoTrimRange != null) 'videoTrimRange': videoTrimRange!.toJson(),
+    if (audioPolicy != null) 'audioPolicy': audioPolicy!.toJson(),
+    if (coverTimestamp != null)
+      'coverTimestampMs': coverTimestamp!.inMilliseconds,
     'elements': elements.map((e) => e.toJson()).toList(),
   };
 
@@ -108,6 +136,22 @@ class StoryPage {
                 Map<String, dynamic>.from(json['backgroundAsset'] as Map),
               )
               : null,
+      videoTrimRange:
+          json['videoTrimRange'] != null
+              ? VideoTrimRange.fromJson(
+                Map<String, dynamic>.from(json['videoTrimRange'] as Map),
+              )
+              : null,
+      audioPolicy:
+          json['audioPolicy'] != null
+              ? VideoAudioPolicy.fromJson(
+                Map<String, dynamic>.from(json['audioPolicy'] as Map),
+              )
+              : null,
+      coverTimestamp:
+          json['coverTimestampMs'] != null
+              ? Duration(milliseconds: json['coverTimestampMs'] as int)
+              : null,
       elements:
           (json['elements'] as List<dynamic>? ?? [])
               .map(
@@ -127,6 +171,9 @@ class StoryPage {
           backgroundColor.toARGB32() == other.backgroundColor.toARGB32() &&
           backgroundGradient == other.backgroundGradient &&
           backgroundAsset == other.backgroundAsset &&
+          videoTrimRange == other.videoTrimRange &&
+          audioPolicy == other.audioPolicy &&
+          coverTimestamp == other.coverTimestamp &&
           listEquals(elements, other.elements);
 
   @override
@@ -136,6 +183,9 @@ class StoryPage {
     backgroundColor,
     backgroundGradient,
     backgroundAsset,
+    videoTrimRange,
+    audioPolicy,
+    coverTimestamp,
     Object.hashAll(elements),
   );
 }
