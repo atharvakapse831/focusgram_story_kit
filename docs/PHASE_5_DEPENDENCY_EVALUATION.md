@@ -1,7 +1,7 @@
 # FocusGram Story Kit — Phase 5 Dependency Evaluation
 
-**Document Version:** 1.0.0  
-**Status:** Evaluation Completed & Strategy Formulated  
+**Document Version:** 1.1.0  
+**Status:** Evaluation Refined & Architecture Approved  
 **Target Branch:** `phase-1/implementation`  
 
 ---
@@ -23,63 +23,104 @@ Phase 5 introduces timeline scrubbing, animated overlays, video playback, and vi
 | **`video_player` (^2.9.2)** (Current) | BSD-3-Clause | ~0 MB (Already integrated) | **Yes** (ExoPlayer / AVPlayer) | None (Official plugin) | Very High (Flutter Core Team) | **YES** (Retain for Canvas Playback) |
 | **`ffmpeg_kit_flutter`** | LGPL-3.0 / GPL-3.0 | **+45 MB to +85 MB** | Partial (Software CPU heavy) | **High** (Patent & GPL review) | Low (Discontinued/Archived upstream) | **NO** (Banned) |
 | **Native Platform Pipeline** (`Media3 Transformer` / `AVFoundation`) | Platform Built-in | **~0 MB** (Uses OS frameworks) | **Yes** (On-chip MediaCodec & VideoToolbox) | None (Standard Apple APIs) | Maximum (Android & iOS OS standard) | **YES** (Recommended Export Architecture) |
-| **`video_thumbnail`** | MIT | ~1.2 MB | Yes (Native platform channels) | None | Medium (Third-party wrapper) | **CONDITIONAL** (Adapter-based) |
+| **`video_thumbnail`** | MIT | ~1.2 MB | Yes (Native platform channels) | None | Medium (Third-party wrapper) | **DEFERRED** (Use native adapter) |
 | **Flutter Built-in Motion** (`dart:ui` & `AnimationController`) | BSD-3-Clause | 0 MB | **Yes** (Impeller / Skia GPU) | None | Maximum (Flutter Core) | **YES** (Recommended Animation Engine) |
 
 ---
 
 ## 3. Deep-Dive Domain Analysis
 
-### 3.1 Video Playback & Timeline Scrubbing
+### 3.1 Video Playback & Timeline Scrubbing: `video_player` (^2.9.2) Evaluation Against Flutter 3.29.0+ & Dart 3.7.0+
 
-#### Candidate: `video_player` (version `^2.9.2`)
-- **Status in Repo:** Already declared in `pubspec.yaml` (line 24).
-- **Architecture:** Backed by Google's `ExoPlayer` / AndroidX Media3 on Android and Apple's `AVPlayer` on iOS.
-- **Suitability for Scrubbing:**
-  - `seekTo(position)` supports millisecond-accurate seeking.
-  - Generates a Flutter texture ID (`Texture(textureId: id)`), allowing video frames to be composited directly inside Flutter's widget tree with 2D transformations (rotation, scaling, translation, clip rect, opacity).
-- **Assessment:** **Retain and standardize.** `video_player` provides optimal playback performance with zero additional binary footprint.
+#### Package Status & SDK Compatibility
+- **Status in Repo:** Declared in `pubspec.yaml` (line 24: `video_player: ^2.9.2`).
+- **Flutter SDK Target:** `>=3.29.0`
+- **Dart SDK Target:** `^3.7.0`
 
----
-
-### 3.2 Video Composition, Encoding & Export
-
-#### Candidate 1: `ffmpeg_kit_flutter`
-- **Pros:** Extremely versatile command-line syntax for video filters, overlay compositing, and audio multiplexing.
-- **Cons & Critical Risks:**
-  1. **Licensing:** FFmpeg uses LGPL 2.1/3.0 with optional GPL components (x264, x265). Dynamic linking requirements under LGPL create compliance burdens, while GPL components are legally incompatible with proprietary commercial applications.
-  2. **Binary Bloat:** Adds between 45MB and 85MB to the final APK/IPA download size, unacceptable for a focused modular story library.
-  3. **Upstream Abandonment:** Tanersener's `ffmpeg-kit` was officially archived in 2024. Maintained forks are fragmented and prone to NDK/Clang toolchain breakage on newer Xcode and Android API levels.
-  4. **Performance:** CPU-based software encoding is slow, consumes excessive battery power, and generates device heat on mobile hardware.
-- **Verdict:** **REJECTED.** Banned from inclusion in the core kit.
-
-#### Candidate 2: Native OS Hardware Pipelines (Media3 Transformer & AVFoundation)
-- **Architecture:**
-  - **Android:** AndroidX `Media3 Transformer` uses `MediaCodec` hardware video encoder and OpenGL ES shaders for overlay blending.
-  - **iOS:** Apple `AVFoundation` uses `AVAssetExportSession`, `AVMutableVideoComposition`, and `AVVideoCompositionCoreAnimationTool` with Apple Silicon hardware encoding engines.
-- **Pros:**
-  - **Speed:** 5x to 10x faster export compared to software encoding.
-  - **Zero App Size Increase:** Utilizes system libraries already present in Android and iOS firmware.
-  - **Reliable Battery & Thermals:** Zero CPU saturation; hardware decoders and encoders handle pixel pipelines.
-- **Verdict:** **SELECTED.** Provide a decoupled `StoryVideoExportAdapter` contract in Story Kit, with native platform implementations utilizing Media3 and AVFoundation.
+#### Architectural Fit with Flutter 3.29.0+ & Impeller
+1. **Texture Registry Lifecycle:**
+   - `video_player` registers a platform texture ID via Flutter's `TextureRegistry` (`SurfaceTexture` / `SurfaceProducer` on Android, `FlutterTexture` backed by `CVPixelBufferRef` on iOS).
+   - In Flutter 3.29.0+, the Impeller rendering backend is the default rendering engine on iOS and standard on modern Android. Impeller composites native textures directly into the GPU scene graph without CPU readback.
+   - *Requirement:* To prevent memory leaks or blank/black frames on surface recreation (e.g. app backgrounding/foregrounding), `VideoPlayerController` disposal and pause/resume lifecycle hooks must be strictly coordinated via `AppLifecycleListener`.
+2. **Precision Scrubbing Contract:**
+   - `video_player` provides `seekTo(Duration)`. On Android (`ExoPlayer`), `seekTo` defaults to keyframe synchronization; for exact frame positioning during timeline scrubbing, the native implementation supports exact seeking when the gesture finishes.
+   - During continuous timeline scrubber drags, `StoryTimelineController` uses throttled approximate seeks to prevent texture decode starvation, and commits an exact seek on drag release (`onHorizontalDragEnd`).
+3. **Role Boundary:**
+   - `video_player` is used **exclusively for in-canvas interactive preview and timeline scrubbing**. It is **not** used for offline video export or audio multiplexing.
 
 ---
 
-### 3.3 Thumbnail & Cover-Frame Generation
+### 3.2 Clarification: Zero `pub.dev` Dependencies vs. Native Android/iOS Dependencies
 
-#### Evaluation:
-- Displaying filmstrip thumbnails in the timeline scrubber requires low-latency decoding of frames at timestamps $t_1, t_2, \dots, t_n$.
-- Native platform `MediaMetadataRetriever` (Android) and `AVAssetImageGenerator` (iOS) extract video frames efficiently at arbitrary time offsets.
-- **Strategy:** Define `StoryThumbnailProvider` interface. Use `VideoPlayerController` for single-frame live covers, and expose an adapter hook for host-app optimized thumbnail cache generation.
+A critical architectural distinction exists between Dart package dependencies and platform-level build dependencies:
+
+```mermaid
+flowchart TD
+    subgraph DartSpace["Pure Flutter / Dart Space (pubspec.yaml)"]
+        SK["focusgram_story_kit"]
+        VP["video_player: ^2.9.2 (Existing)"]
+        CNI["cached_network_image (Existing)"]
+        EXP["StoryVideoExportAdapter (Abstract Interface)"]
+        SK --> VP
+        SK --> CNI
+        SK --> EXP
+    end
+
+    subgraph NativeSpace["Platform Hardware Acceleration Layer"]
+        EXP -.->|Host App Implementation / Native Plugin| NativeImpl["Native Video Export Implementation"]
+        NativeImpl -->|Android (build.gradle)| Media3["androidx.media3:media3-transformer<br/>androidx.media3:media3-effect"]
+        NativeImpl -->|iOS (System Frameworks)| AVF["AVFoundation + VideoToolbox<br/>CoreMedia + CoreAnimation (0 CocoaPods)"]
+    end
+```
+
+1. **Pure Dart Layer (`pubspec.yaml`):**
+   - **Zero new `pub.dev` dependencies are added to `pubspec.yaml`.**
+   - The story kit remains a modular, lean Dart package with no dependency bloat, no third-party NLE wrappers, and no licensing entanglements.
+2. **Native Platform Layer:**
+   - Video hardware encoding, multi-track audio multiplexing, and final MP4 packaging require OS-level hardware encoder access (`MediaCodec` on Android, `VideoToolbox` on iOS).
+   - On **Android**, native export leverages Google's official AndroidX Media3 libraries:
+     - `androidx.media3:media3-transformer`
+     - `androidx.media3:media3-effect`
+     - `androidx.media3:media3-common`
+     These are modern, Google-maintained AndroidX dependencies included in the host Android build or platform plugin, adding minimal DEX footprint and utilizing device hardware encoders.
+   - On **iOS**, native export uses system frameworks built directly into iOS firmware:
+     - `AVFoundation` (`AVAssetExportSession`, `AVMutableVideoComposition`, `AVVideoCompositionCoreAnimationTool`)
+     - `VideoToolbox` (hardware H.264/HEVC encoding)
+     - `CoreMedia` & `CoreAudio`
+     These require **zero CocoaPods or SPM third-party packages**.
+
+---
+
+### 3.3 Platform Video Composition & Crossfade Mechanics: Android Media3 vs. iOS AVFoundation
+
+When combining background video with animated overlays or video transitions, platform composition architectures exhibit distinct capabilities and constraints:
+
+#### Android Media3 Transformer: Capabilities & Crossfade Constraints
+- **Architecture:** AndroidX `Media3 Transformer` processes video via a pipeline of `MediaCodec` decoders $\to$ OpenGL ES shader effects (`GlEffect` / `GlShaderProgram`) $\to$ `MediaCodec` hardware encoder $\to$ `Muxer`.
+- **Overlay Composition:** Static and animated overlays are blended into the video stream via an OpenGL overlay shader by passing RGBA bitmaps or dynamic overlay surfaces.
+- **Crossfade Limitations:**
+  - True video-to-video crossfades (fading between two concurrent video clips) require decoding two video streams simultaneously.
+  - On many mid-to-low-tier Android devices (e.g. MediaTek, older Qualcomm chipsets), hardware decoders have strict concurrent instance limits (often capped at 2 to 4 simultaneous `MediaCodec` instances across the entire OS).
+  - If the host app or system is playing audio/video while Transformer attempts dual decoding, decoder resource starvation (`MediaCodec.CodecException: ERROR_INSUFFICIENT_RESOURCE`) occurs.
+- **Phase 5 Strategy for Android:**
+  - Standard story pages contain a single primary video asset with overlay layers (text, stickers, shapes, drawings). Media3 handles single-video decode + GL overlay blend with 100% hardware stability.
+  - Video cut transitions (concatenation) are handled sequentially via `EditedMediaItemSequence`.
+  - For crossfades between pages, the kit provides an RGBA frame-blended texture transition, avoiding dual-hardware-decoder starvation.
+
+#### iOS AVFoundation: Custom Compositor Strategy
+- **Architecture:** iOS uses `AVMutableVideoComposition` and `AVAssetExportSession`.
+- **Custom Compositor Contract:**
+  - For advanced transition parity and pixel-accurate blending, AVFoundation supports custom compositors conforming to the `AVVideoCompositing` protocol.
+  - In `startRequest:`, the custom compositor receives pixel buffers (`CVPixelBufferRef`) from multiple source tracks and renders into the target pixel buffer using Metal (`MTLRenderCommandEncoder`) or Core Image (`CIContext`).
+  - Unlike Android, iOS hardware decoders cleanly handle concurrent 1080p video streams on all devices running iOS 14+.
+- **CoreAnimation Alternative:**
+  - For standard story exports (background video + animated Flutter overlays), `AVVideoCompositionCoreAnimationTool` synchronizes an exported `CALayer` hierarchy containing Flutter's animated vector and text assets with the video track at zero export overhead.
 
 ---
 
 ### 3.4 Animation & Motion System
-
-#### Evaluation:
-- Third-party animation packages (e.g. `simple_animations`, `flutter_animate`) introduce unnecessary dependencies and opinionated APIs that can change or break across major Flutter releases.
-- Flutter's built-in `dart:ui`, `AnimationController`, and `Curve` library are mathematically pure, thoroughly optimized, and natively supported by the Impeller GPU engine.
-- **Strategy:** Build `OverlayAnimation` on top of pure Flutter `Curve` primitives (`Curves.easeIn`, `Curves.easeOut`, `Curves.elasticOut`, `Curves.bounceOut`). This ensures zero dependency bloat and pure mathematical determinism during both preview and frame-by-frame export.
+- Built-in Flutter `dart:ui`, `AnimationController`, and `Curve` library are mathematically pure, thoroughly optimized, and natively supported by the Impeller GPU engine.
+- Build `OverlayAnimation` on top of pure Flutter `Curve` primitives (`Curves.easeIn`, `Curves.easeOut`, `Curves.elasticOut`, `Curves.bounceOut`). This ensures zero dependency bloat and pure mathematical determinism during both preview and frame-by-frame export.
 
 ---
 
