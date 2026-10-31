@@ -6,7 +6,9 @@ import '../../models/story_media_asset.dart';
 import '../../models/story_transform.dart';
 import '../editor_controller.dart';
 import 'canvas_element_view.dart';
+import 'drawing_canvas_overlay.dart';
 import 'selection_overlay.dart';
+import 'snapping_guidelines.dart';
 
 /// The interactive story canvas preview.
 ///
@@ -47,7 +49,13 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
 
                 return ClipRect(
                   child: Container(
-                    color: page.backgroundColor,
+                    decoration: BoxDecoration(
+                      color:
+                          page.backgroundGradient == null
+                              ? page.backgroundColor
+                              : null,
+                      gradient: page.backgroundGradient?.toGradient(),
+                    ),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapUp: (details) => _handleTapUp(details, canvasSize),
@@ -66,14 +74,32 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
 
                           // 2. Elements rendered in deterministic z-order
                           for (final el in page.sortedElements)
-                            _buildPositionedElement(el, canvasSize),
+                            if (el.isVisible)
+                              _buildPositionedElement(el, canvasSize),
 
                           // 3. Selection overlay for currently active element
-                          if (selectedId != null &&
-                              page.getElement(selectedId) != null)
+                          if (!widget.controller.state.isDrawingMode &&
+                              selectedId != null &&
+                              page.getElement(selectedId) != null &&
+                              page.getElement(selectedId)!.isVisible)
                             _buildSelectionChrome(
                               page.getElement(selectedId)!,
                               canvasSize,
+                            ),
+
+                          // 4. Snapping guidelines indicators
+                          SnappingGuidelinesOverlay(
+                            snapX: widget.controller.state.snapX,
+                            snapY: widget.controller.state.snapY,
+                            canvasSize: canvasSize,
+                          ),
+
+                          // 5. Drawing overlay when in freehand drawing mode
+                          if (widget.controller.state.isDrawingMode)
+                            Positioned.fill(
+                              child: DrawingCanvasOverlay(
+                                controller: widget.controller,
+                              ),
                             ),
                         ],
                       ),
@@ -157,11 +183,14 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
   }
 
   void _handleTapUp(TapUpDetails details, Size canvasSize) {
+    if (widget.controller.state.isDrawingMode) return;
     final point = details.localPosition;
     final elements = widget.controller.activePage.sortedElements.reversed;
 
     for (final el in elements) {
-      if (!el.isLocked && el.transform.containsPoint(point, canvasSize)) {
+      if (!el.isLocked &&
+          el.isVisible &&
+          el.transform.containsPoint(point, canvasSize)) {
         widget.controller.selectElement(el.id);
         return;
       }
@@ -172,16 +201,21 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
   }
 
   void _handleScaleStart(ScaleStartDetails details, Size canvasSize) {
+    if (widget.controller.state.isDrawingMode) return;
     final point = details.localFocalPoint;
     final selected = widget.controller.selectedElement;
 
     // Check if touching current selected element or another selectable element
     String? targetId = selected?.id;
     if (selected == null ||
+        selected.isLocked ||
+        !selected.isVisible ||
         !selected.transform.containsPoint(point, canvasSize)) {
       final elements = widget.controller.activePage.sortedElements.reversed;
       for (final el in elements) {
-        if (!el.isLocked && el.transform.containsPoint(point, canvasSize)) {
+        if (!el.isLocked &&
+            el.isVisible &&
+            el.transform.containsPoint(point, canvasSize)) {
           targetId = el.id;
           widget.controller.selectElement(el.id);
           break;
@@ -191,7 +225,7 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
 
     if (targetId != null) {
       final target = widget.controller.activePage.getElement(targetId);
-      if (target != null) {
+      if (target != null && !target.isLocked && target.isVisible) {
         _initialFocalPoint = point;
         _initialTransform = target.transform;
         widget.controller.setInteracting(true);
@@ -212,11 +246,31 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
     final normalizedDx = delta.dx / canvasSize.width;
     final normalizedDy = delta.dy / canvasSize.height;
 
+    var targetX = _initialTransform!.x + normalizedDx;
+    var targetY = _initialTransform!.y + normalizedDy;
+
+    double? snappedX;
+    double? snappedY;
+
+    // Center X snap (tolerance ~1.5% of canvas width)
+    if ((targetX - 0.5).abs() < 0.015) {
+      targetX = 0.5;
+      snappedX = 0.5;
+    }
+
+    // Center Y snap (tolerance ~1.5% of canvas height)
+    if ((targetY - 0.5).abs() < 0.015) {
+      targetY = 0.5;
+      snappedY = 0.5;
+    }
+
+    widget.controller.setSnapGuidelines(snapX: snappedX, snapY: snappedY);
+
     final updatedTransform =
         _initialTransform!
             .copyWith(
-              x: _initialTransform!.x + normalizedDx,
-              y: _initialTransform!.y + normalizedDy,
+              x: targetX,
+              y: targetY,
               scale: (_initialTransform!.scale * details.scale).clamp(0.2, 5.0),
               rotation:
                   (_initialTransform!.rotation + details.rotation) %
@@ -232,6 +286,8 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
   }
 
   void _handleScaleEnd() {
+    widget.controller.setSnapGuidelines(snapX: null, snapY: null);
+
     final selected = widget.controller.selectedElement;
     if (selected != null && _initialTransform != null) {
       // Commit final coalesced command

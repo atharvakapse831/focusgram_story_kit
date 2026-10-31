@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/element_payloads.dart';
+import '../models/gradient_background.dart';
 import '../models/story_element.dart';
 import '../models/story_media_asset.dart';
 import '../models/story_page.dart';
@@ -315,6 +316,300 @@ class SetPageBackgroundCommand extends EditorCommand {
         clearBackgroundAsset: previousAsset == null,
       );
     });
+  }
+}
+
+/// Sets or clears the gradient background on a story page.
+class SetPageGradientCommand extends EditorCommand {
+  const SetPageGradientCommand({
+    required this.pageId,
+    required this.previousGradient,
+    required this.newGradient,
+  });
+
+  final String pageId;
+  final StoryGradientBackground? previousGradient;
+  final StoryGradientBackground? newGradient;
+
+  @override
+  String get description =>
+      newGradient != null ? 'Set gradient' : 'Clear gradient';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        backgroundGradient: newGradient,
+        clearBackgroundGradient: newGradient == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        backgroundGradient: previousGradient,
+        clearBackgroundGradient: previousGradient == null,
+      );
+    });
+  }
+}
+
+/// Toggles whether an element is locked against selection and modification.
+class ToggleElementLockCommand extends EditorCommand {
+  const ToggleElementLockCommand({
+    required this.pageId,
+    required this.elementId,
+  });
+
+  final String pageId;
+  final String elementId;
+
+  @override
+  String get description => 'Toggle element lock';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(isLocked: !el.isLocked);
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(isLocked: !el.isLocked);
+    });
+  }
+}
+
+/// Toggles whether an element is visible on the canvas and export.
+class ToggleElementVisibilityCommand extends EditorCommand {
+  const ToggleElementVisibilityCommand({
+    required this.pageId,
+    required this.elementId,
+  });
+
+  final String pageId;
+  final String elementId;
+
+  @override
+  String get description => 'Toggle element visibility';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(isVisible: !el.isVisible);
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(isVisible: !el.isVisible);
+    });
+  }
+}
+
+/// Appends a freehand drawing stroke to the active page's drawing layer.
+class AddDrawingStrokeCommand extends EditorCommand {
+  const AddDrawingStrokeCommand({
+    required this.pageId,
+    required this.stroke,
+    this.drawingElementId,
+  });
+
+  final String pageId;
+  final DrawingStroke stroke;
+  final String? drawingElementId;
+
+  @override
+  String get description => 'Draw stroke';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      final targetId = drawingElementId ?? 'drawing_${page.id}';
+      final existingEl = page.getElement(targetId);
+
+      if (existingEl != null && existingEl.payload is DrawingElementPayload) {
+        final currentPayload = existingEl.payload as DrawingElementPayload;
+        final updatedPayload = currentPayload.copyWith(
+          strokes: [...currentPayload.strokes, stroke],
+        );
+        return page.copyWith(
+          elements:
+              page.elements.map((el) {
+                if (el.id == targetId) {
+                  return el.copyWith(payload: updatedPayload);
+                }
+                return el;
+              }).toList(),
+        );
+      } else {
+        final newDrawingEl = StoryElement(
+          id: targetId,
+          type: StoryElementType.drawing,
+          transform: const StoryTransform(
+            x: 0.5,
+            y: 0.5,
+            width: 1.0,
+            height: 1.0,
+          ),
+          payload: DrawingElementPayload(strokes: [stroke]),
+          zIndex: 100,
+        );
+        return page.copyWith(elements: [...page.elements, newDrawingEl]);
+      }
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      final targetId = drawingElementId ?? 'drawing_${page.id}';
+      final existingEl = page.getElement(targetId);
+      if (existingEl == null || existingEl.payload is! DrawingElementPayload) {
+        return page;
+      }
+
+      final currentPayload = existingEl.payload as DrawingElementPayload;
+      if (currentPayload.strokes.isEmpty) return page;
+
+      final updatedStrokes = List<DrawingStroke>.from(currentPayload.strokes);
+      updatedStrokes.removeLast();
+
+      if (updatedStrokes.isEmpty) {
+        return page.copyWith(
+          elements: page.elements.where((e) => e.id != targetId).toList(),
+        );
+      } else {
+        return page.copyWith(
+          elements:
+              page.elements.map((el) {
+                if (el.id == targetId) {
+                  return el.copyWith(
+                    payload: currentPayload.copyWith(strokes: updatedStrokes),
+                  );
+                }
+                return el;
+              }).toList(),
+        );
+      }
+    });
+  }
+}
+
+/// Clears all drawing strokes on a drawing layer with full undo recovery.
+class ClearDrawingCommand extends EditorCommand {
+  const ClearDrawingCommand({
+    required this.pageId,
+    required this.drawingElementId,
+    required this.previousStrokes,
+  });
+
+  final String pageId;
+  final String drawingElementId;
+  final List<DrawingStroke> previousStrokes;
+
+  @override
+  String get description => 'Clear drawing';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        elements: page.elements.where((e) => e.id != drawingElementId).toList(),
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      final drawingEl = StoryElement(
+        id: drawingElementId,
+        type: StoryElementType.drawing,
+        transform: const StoryTransform(
+          x: 0.5,
+          y: 0.5,
+          width: 1.0,
+          height: 1.0,
+        ),
+        payload: DrawingElementPayload(strokes: previousStrokes),
+        zIndex: 100,
+      );
+      return page.copyWith(elements: [...page.elements, drawingEl]);
+    });
+  }
+}
+
+/// Updates non-destructive color adjustments and filter presets on an image layer.
+class UpdateImageAdjustmentsCommand extends EditorCommand {
+  const UpdateImageAdjustmentsCommand({
+    required this.pageId,
+    required this.elementId,
+    required this.previousAdjustments,
+    required this.newAdjustments,
+  });
+
+  final String pageId;
+  final String elementId;
+  final ImageAdjustments previousAdjustments;
+  final ImageAdjustments newAdjustments;
+
+  @override
+  String get description => 'Update image adjustments';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      if (el.payload is ImageElementPayload) {
+        final imgPayload = el.payload as ImageElementPayload;
+        return el.copyWith(
+          payload: imgPayload.copyWith(adjustments: newAdjustments),
+        );
+      }
+      return el;
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      if (el.payload is ImageElementPayload) {
+        final imgPayload = el.payload as ImageElementPayload;
+        return el.copyWith(
+          payload: imgPayload.copyWith(adjustments: previousAdjustments),
+        );
+      }
+      return el;
+    });
+  }
+}
+
+/// Applies a preset template to the active page, saving prior page state for undo.
+class ApplyTemplateCommand extends EditorCommand {
+  const ApplyTemplateCommand({
+    required this.previousPage,
+    required this.templatedPage,
+  });
+
+  final StoryPage previousPage;
+  final StoryPage templatedPage;
+
+  @override
+  String get description => 'Apply template';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, previousPage.id, (page) => templatedPage);
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, templatedPage.id, (page) => previousPage);
   }
 }
 

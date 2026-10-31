@@ -35,3 +35,30 @@ export 'draft/in_memory_draft_repository.dart';
 // Phase 3 — Still Image Exporter
 export 'export/export_result.dart';
 export 'export/still_image_exporter.dart';
+
+// Phase 4 — Expanded Editing Capabilities & Models
+export 'models/image_adjustments.dart';
+export 'models/drawing_stroke.dart';
+export 'models/shape_payload.dart';
+export 'models/gradient_background.dart';
+export 'models/story_template.dart';
+
+// Phase 4 — Media, Capture & Asset Adapters
+export 'media/media_picker_adapter.dart';
+export 'media/capture_adapter.dart';
+export 'assets/asset_provider.dart';
+
+// Phase 4 — Theming & Centralized Localization
+export 'theme/story_kit_theme.dart';
+export 'localization/story_kit_strings.dart';
+
+// Phase 4 — Canvas Overlays & Modal Editor Panels
+export 'editor/canvas/drawing_canvas_overlay.dart';
+export 'editor/canvas/snapping_guidelines.dart';
+export 'editor/panels/drawing_toolbar.dart';
+export 'editor/panels/shape_picker_sheet.dart';
+export 'editor/panels/image_adjustment_sheet.dart';
+export 'editor/panels/rich_text_editor_sheet.dart';
+export 'editor/panels/sticker_picker_sheet.dart';
+export 'editor/panels/layer_manager_sheet.dart';
+export 'editor/panels/template_picker_sheet.dart';

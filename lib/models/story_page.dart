@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'gradient_background.dart';
 import 'story_element.dart';
 import 'story_media_asset.dart';
 
@@ -10,6 +11,7 @@ class StoryPage {
     required this.id,
     this.duration = const Duration(seconds: 5),
     this.backgroundColor = Colors.black,
+    this.backgroundGradient,
     this.backgroundAsset,
     this.elements = const [],
   });
@@ -22,6 +24,9 @@ class StoryPage {
 
   /// Solid background fill color.
   final Color backgroundColor;
+
+  /// Optional gradient background fill.
+  final StoryGradientBackground? backgroundGradient;
 
   /// Optional background image/asset.
   final StoryMediaAsset? backgroundAsset;
@@ -48,6 +53,8 @@ class StoryPage {
     String? id,
     Duration? duration,
     Color? backgroundColor,
+    StoryGradientBackground? backgroundGradient,
+    bool clearBackgroundGradient = false,
     StoryMediaAsset? backgroundAsset,
     bool clearBackgroundAsset = false,
     List<StoryElement>? elements,
@@ -56,6 +63,10 @@ class StoryPage {
       id: id ?? this.id,
       duration: duration ?? this.duration,
       backgroundColor: backgroundColor ?? this.backgroundColor,
+      backgroundGradient:
+          clearBackgroundGradient
+              ? null
+              : (backgroundGradient ?? this.backgroundGradient),
       backgroundAsset:
           clearBackgroundAsset
               ? null
@@ -68,6 +79,8 @@ class StoryPage {
     'id': id,
     'durationMs': duration.inMilliseconds,
     'backgroundColor': backgroundColor.toARGB32(),
+    if (backgroundGradient != null)
+      'backgroundGradient': backgroundGradient!.toJson(),
     if (backgroundAsset != null) 'backgroundAsset': backgroundAsset!.toJson(),
     'elements': elements.map((e) => e.toJson()).toList(),
   };
@@ -83,6 +96,12 @@ class StoryPage {
           json['backgroundColor'] != null
               ? Color(json['backgroundColor'] as int)
               : Colors.black,
+      backgroundGradient:
+          json['backgroundGradient'] != null
+              ? StoryGradientBackground.fromJson(
+                Map<String, dynamic>.from(json['backgroundGradient'] as Map),
+              )
+              : null,
       backgroundAsset:
           json['backgroundAsset'] != null
               ? StoryMediaAsset.fromJson(
@@ -103,10 +122,10 @@ class StoryPage {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is StoryPage &&
-          runtimeType == other.runtimeType &&
           id == other.id &&
           duration == other.duration &&
-          backgroundColor == other.backgroundColor &&
+          backgroundColor.toARGB32() == other.backgroundColor.toARGB32() &&
+          backgroundGradient == other.backgroundGradient &&
           backgroundAsset == other.backgroundAsset &&
           listEquals(elements, other.elements);
 
@@ -115,6 +134,7 @@ class StoryPage {
     id,
     duration,
     backgroundColor,
+    backgroundGradient,
     backgroundAsset,
     Object.hashAll(elements),
   );
