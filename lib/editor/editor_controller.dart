@@ -7,6 +7,7 @@ import '../models/story_page.dart';
 import '../models/story_project.dart';
 import '../models/story_template.dart';
 import '../models/story_transform.dart';
+import '../timeline/timeline_controller.dart';
 import 'command_history.dart';
 import 'editor_commands.dart';
 import 'editor_state.dart';
@@ -35,6 +36,19 @@ class EditorController extends ChangeNotifier {
   late EditorState _state;
   final CommandHistory _history;
   late int _lastSavedRevision;
+  StoryTimelineController? _timelineController;
+
+  /// Single source of truth timeline controller for video playback and animated layers.
+  StoryTimelineController get timelineController {
+    if (_timelineController == null) {
+      final page = activePage;
+      _timelineController = StoryTimelineController(
+        initialDuration: page.duration,
+        initialTrimRange: page.videoTrimRange,
+      );
+    }
+    return _timelineController!;
+  }
 
   /// Current serializable story document.
   StoryProject get project => _project;
@@ -76,6 +90,14 @@ class EditorController extends ChangeNotifier {
   void selectPage(String pageId) {
     if (_state.activePageId == pageId) return;
     _state = _state.copyWith(activePageId: pageId, clearSelectedElement: true);
+    final targetPage = _project.getPage(pageId);
+    if (targetPage != null && _timelineController != null) {
+      _timelineController!.setTotalDuration(targetPage.duration);
+      _timelineController!.setTrimRange(targetPage.videoTrimRange);
+      _timelineController!.seekTo(
+        targetPage.videoTrimRange?.start ?? Duration.zero,
+      );
+    }
     notifyListeners();
   }
 
@@ -104,6 +126,14 @@ class EditorController extends ChangeNotifier {
   /// Toggles visibility of the bottom page strip.
   void togglePageStrip() {
     _state = _state.copyWith(showPageStrip: !_state.showPageStrip);
+    notifyListeners();
+  }
+
+  /// Toggles visibility of the video timeline scrubber.
+  void toggleTimeline([bool? show]) {
+    final next = show ?? !_state.showTimeline;
+    if (_state.showTimeline == next) return;
+    _state = _state.copyWith(showTimeline: next);
     notifyListeners();
   }
 
@@ -405,6 +435,102 @@ class EditorController extends ChangeNotifier {
       activeBrushWidth: brushWidth,
     );
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phase 5 Video, Timeline & Animation Actions
+  // ---------------------------------------------------------------------------
+
+  /// Updates the trim boundaries for the active page's background video.
+  void setVideoTrimRange(VideoTrimRange? range) {
+    final page = activePage;
+    execute(
+      SetPageVideoTrimRangeCommand(
+        pageId: page.id,
+        newTrimRange: range,
+        previousTrimRange: page.videoTrimRange,
+      ),
+    );
+    _timelineController?.setTrimRange(range);
+  }
+
+  /// Updates the audio mixing/muting policy for the active page.
+  void setAudioPolicy(VideoAudioPolicy? policy) {
+    final page = activePage;
+    execute(
+      SetPageAudioPolicyCommand(
+        pageId: page.id,
+        newAudioPolicy: policy,
+        previousAudioPolicy: page.audioPolicy,
+      ),
+    );
+  }
+
+  /// Updates the cover frame timestamp for the active page.
+  void setCoverTimestamp(Duration? timestamp) {
+    final page = activePage;
+    execute(
+      SetPageCoverTimestampCommand(
+        pageId: page.id,
+        newCoverTimestamp: timestamp,
+        previousCoverTimestamp: page.coverTimestamp,
+      ),
+    );
+  }
+
+  /// Sets the time-bounded visibility range for a specific layer.
+  void setElementTimeRange(String elementId, LayerTimeRange? range) {
+    final page = activePage;
+    final el = page.getElement(elementId);
+    if (el == null) return;
+
+    execute(
+      SetElementTimeRangeCommand(
+        pageId: page.id,
+        elementId: elementId,
+        newTimeRange: range,
+        previousTimeRange: el.visibleTimeRange,
+      ),
+    );
+  }
+
+  /// Sets the entrance/exit animation configuration for a specific layer.
+  void setElementAnimation(
+    String elementId,
+    OverlayAnimationConfig? animation,
+  ) {
+    final page = activePage;
+    final el = page.getElement(elementId);
+    if (el == null) return;
+
+    execute(
+      SetElementAnimationCommand(
+        pageId: page.id,
+        elementId: elementId,
+        newAnimation: animation,
+        previousAnimation: el.animation,
+      ),
+    );
+  }
+
+  /// Splits the active video page into two contiguous pages at [splitTime].
+  void splitVideoClip(Duration splitTime) {
+    final page = activePage;
+    final newPageId = 'page_${DateTime.now().millisecondsSinceEpoch}_split';
+    execute(
+      SplitPageVideoClipCommand(
+        pageId: page.id,
+        newPageId: newPageId,
+        splitTime: splitTime,
+        previousPage: page,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _timelineController?.dispose();
+    super.dispose();
   }
 
   // ---------------------------------------------------------------------------
