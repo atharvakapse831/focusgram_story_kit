@@ -93,7 +93,8 @@ class TimestampBitmapOverlay(
         }
     }
 
-    fun release() {
+    override fun release() {
+        super.release()
         synchronized(lruCache) {
             lruCache.clear()
         }
