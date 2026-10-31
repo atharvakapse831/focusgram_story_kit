@@ -88,4 +88,5 @@ export 'editor/panels/cover_picker_sheet.dart';
 export 'export/export_error.dart';
 export 'export/video_export_job.dart';
 export 'export/video_export_adapter.dart';
+export 'export/story_video_overlay_rasterizer.dart';
 export 'export/story_video_exporter.dart';

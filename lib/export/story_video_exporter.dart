@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import '../models/story_project.dart';
 import 'export_error.dart';
+import 'story_video_overlay_rasterizer.dart';
 import 'video_export_adapter.dart';
 import 'video_export_job.dart';
 
@@ -103,6 +104,7 @@ class StoryVideoExporter {
       project: project,
       config: config,
       jobId: jobId,
+      peakStorageRequired: peakStorageRequired,
     );
 
     return job;
@@ -113,6 +115,7 @@ class StoryVideoExporter {
     required StoryProject project,
     required StoryVideoExportConfig config,
     required String jobId,
+    required int peakStorageRequired,
   }) async {
     Directory? jobDir;
     try {
@@ -128,12 +131,59 @@ class StoryVideoExporter {
         message: 'Sandbox directory prepared: ${jobDir.path}',
       );
 
+      // Rasterize overlays if any elements are present across pages
+      final hasAnyElements = project.pages.any((p) => p.elements.isNotEmpty);
+      final pageOverlayFrames = <String, List<OverlayFrameEntry>>{};
+
+      if (hasAnyElements) {
+        job.emitProgress(
+          VideoExportPhase.renderingOverlays,
+          0.10,
+          message: 'Rasterizing animated canvas overlays...',
+        );
+
+        final overlayDir = Directory('${jobDir.path}/overlays');
+        const rasterizer = StoryVideoOverlayRasterizer();
+
+        for (var i = 0; i < project.pages.length; i++) {
+          if (job.isCancelled) {
+            throw VideoExportException(
+              code: ExportErrorCode.cancelled,
+              message:
+                  'Export job $jobId was cancelled during overlay rendering.',
+              jobId: jobId,
+            );
+          }
+          final page = project.pages[i];
+          final frames = await rasterizer.rasterizePageOverlays(
+            page: page,
+            canvasSpec: project.canvasSpec,
+            outputDir: overlayDir,
+            width: config.width,
+            height: config.height,
+            frameRate: config.frameRate.toDouble(),
+            checkCancelled: () => job.isCancelled,
+          );
+          pageOverlayFrames[page.id] = frames;
+          final progressFraction =
+              0.10 + (0.20 * ((i + 1) / project.pages.length));
+          job.emitProgress(
+            VideoExportPhase.renderingOverlays,
+            progressFraction,
+            message:
+                'Rasterized overlays for page ${i + 1}/${project.pages.length}',
+          );
+        }
+      }
+
       final result = await _adapter
           .exportVideo(
             jobId: jobId,
             project: project,
             config: config,
             workingDirectory: jobDir.path,
+            pageOverlayFrames: pageOverlayFrames,
+            requiredStorageBytes: peakStorageRequired,
             onProgress:
                 (p) => job.emitProgress(
                   p.phase,

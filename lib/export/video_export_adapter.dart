@@ -5,6 +5,7 @@ import '../models/element_payloads.dart';
 import '../models/story_project.dart';
 import 'export_error.dart';
 import 'export_result.dart';
+import 'story_video_overlay_rasterizer.dart';
 import 'video_export_job.dart';
 
 /// Configuration options for video rendering and hardware export.
@@ -92,6 +93,8 @@ abstract class StoryVideoExportAdapter {
     required String workingDirectory,
     required void Function(VideoExportProgress progress) onProgress,
     required bool Function() checkCancelled,
+    Map<String, List<OverlayFrameEntry>>? pageOverlayFrames,
+    int? requiredStorageBytes,
   });
 
   /// Aborts native video encoding and frees platform pipeline resources for [jobId].
@@ -127,6 +130,8 @@ class MethodChannelStoryVideoExportAdapter implements StoryVideoExportAdapter {
     required String workingDirectory,
     required void Function(VideoExportProgress progress) onProgress,
     required bool Function() checkCancelled,
+    Map<String, List<OverlayFrameEntry>>? pageOverlayFrames,
+    int? requiredStorageBytes,
   }) async {
     if (checkCancelled()) {
       throw VideoExportException(
@@ -159,8 +164,21 @@ class MethodChannelStoryVideoExportAdapter implements StoryVideoExportAdapter {
               'trimEndMs': p.trimRange.end.inMilliseconds,
               'volume': p.audioPolicy.volumeMultiplier,
               'muted': p.audioPolicy.isMuted,
+              'transform': e.transform.toJson(),
+              'opacity': e.opacity,
+              'zIndex': e.zIndex,
+              'startMs': e.visibleTimeRange?.start.inMilliseconds ?? 0,
+              'endMs':
+                  e.visibleTimeRange?.end.inMilliseconds ??
+                  page.duration.inMilliseconds,
+              'fitMode': p.fitMode.name,
             };
           }).toList();
+
+      final overlayFrames =
+          (pageOverlayFrames?[page.id] ?? const [])
+              .map((f) => f.toJson())
+              .toList();
 
       pagesPayload.add({
         'id': page.id,
@@ -172,12 +190,14 @@ class MethodChannelStoryVideoExportAdapter implements StoryVideoExportAdapter {
         'muted': page.audioPolicy?.isMuted ?? false,
         'volume': page.audioPolicy?.volumeMultiplier ?? 1.0,
         'videoElements': videoElements,
+        'overlayFrames': overlayFrames,
       });
     }
 
     final arguments = {
       'jobId': jobId,
       'workingDirectory': workingDirectory,
+      'requiredBytes': requiredStorageBytes ?? 52428800,
       'width': config.width,
       'height': config.height,
       'frameRate': config.frameRate,
@@ -300,6 +320,8 @@ class SoftwareStoryVideoExportAdapter implements StoryVideoExportAdapter {
     required String workingDirectory,
     required void Function(VideoExportProgress progress) onProgress,
     required bool Function() checkCancelled,
+    Map<String, List<OverlayFrameEntry>>? pageOverlayFrames,
+    int? requiredStorageBytes,
   }) async {
     final phases = [
       VideoExportPhase.preparing,
