@@ -12,7 +12,10 @@ private class ActiveExportSession {
     let jobId: String
     let session: AVAssetExportSession
     let outputURL: URL
-    let resultCallback: FlutterResult
+    private let resultCallback: FlutterResult
+    private var hasReplied = false
+    private let lock = NSLock()
+
     var isCancelled: Bool = false
 
     init(jobId: String, session: AVAssetExportSession, outputURL: URL, resultCallback: @escaping FlutterResult) {
@@ -20,6 +23,16 @@ private class ActiveExportSession {
         self.session = session
         self.outputURL = outputURL
         self.resultCallback = resultCallback
+    }
+
+    func complete(result: Any?) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !hasReplied else { return }
+        hasReplied = true
+        DispatchQueue.main.async {
+            self.resultCallback(result)
+        }
     }
 }
 
@@ -288,9 +301,12 @@ public class FocusgramStoryKitPlugin: NSObject, FlutterPlugin {
                 _ = self.activeSessions.removeValue(forKey: jobId)
             }
 
-            DispatchQueue.main.async {
-                switch exportSession.status {
-                case .completed:
+            switch exportSession.status {
+            case .completed:
+                if activeJob.isCancelled {
+                    try? FileManager.default.removeItem(at: outputURL)
+                    activeJob.complete(result: FlutterError(code: "CANCELLED", message: "Export cancelled by user", details: nil))
+                } else {
                     let fileSize = (try? FileManager.default.attributesOfItem(atPath: outputURL.path)[.size] as? Int) ?? 0
                     let durationMs = Int(totalDurationSec * 1000.0)
                     let resultMap: [String: Any] = [
@@ -305,17 +321,17 @@ public class FocusgramStoryKitPlugin: NSObject, FlutterPlugin {
                         "audioCodec": "aac",
                         "sampleRate": sampleRate
                     ]
-                    activeJob.resultCallback(resultMap)
-                case .cancelled:
-                    try? FileManager.default.removeItem(at: outputURL)
-                    activeJob.resultCallback(FlutterError(code: "CANCELLED", message: "Export cancelled by user", details: nil))
-                case .failed:
-                    try? FileManager.default.removeItem(at: outputURL)
-                    let errorMsg = exportSession.error?.localizedDescription ?? "Unknown AVAssetExportSession error"
-                    activeJob.resultCallback(FlutterError(code: "RENDER_FAILED", message: errorMsg, details: nil))
-                default:
-                    break
+                    activeJob.complete(result: resultMap)
                 }
+            case .cancelled:
+                try? FileManager.default.removeItem(at: outputURL)
+                activeJob.complete(result: FlutterError(code: "CANCELLED", message: "Export cancelled by user", details: nil))
+            case .failed:
+                try? FileManager.default.removeItem(at: outputURL)
+                let errorMsg = exportSession.error?.localizedDescription ?? "Unknown AVAssetExportSession error"
+                activeJob.complete(result: FlutterError(code: "RENDER_FAILED", message: errorMsg, details: nil))
+            default:
+                break
             }
         }
     }
@@ -331,7 +347,10 @@ public class FocusgramStoryKitPlugin: NSObject, FlutterPlugin {
             if let active = self.activeSessions.removeValue(forKey: jobId) {
                 active.isCancelled = true
                 active.session.cancelExport()
-                try? FileManager.default.removeItem(at: active.outputURL)
+                if FileManager.default.fileExists(atPath: active.outputURL.path) {
+                    try? FileManager.default.removeItem(at: active.outputURL)
+                }
+                active.complete(result: FlutterError(code: "CANCELLED", message: "Export cancelled by user", details: nil))
             }
         }
         result(nil)

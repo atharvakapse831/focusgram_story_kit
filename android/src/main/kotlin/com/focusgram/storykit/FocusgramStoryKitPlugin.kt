@@ -401,7 +401,7 @@ class FocusgramStoryKitPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
 
-        // P0 Cancellation State Machine: ensure native handle release before file deletion
+        // P0 Cancellation State Machine: explicit native termination acknowledgement
         if (job.state.compareAndSet(ExportJobContext.STATE_RUNNING, ExportJobContext.STATE_CANCELLING)) {
             job.cancelResultCallback.set(result)
             Thread {
@@ -409,16 +409,44 @@ class FocusgramStoryKitPlugin : FlutterPlugin, MethodCallHandler {
                     job.transformer.cancel()
                 } catch (_: Exception) {}
 
+                // Explicit native termination acknowledgement: wait until Media3 reports NOT_STARTED
+                val progressHolder = ProgressHolder()
+                var pollCycles = 0
+                val maxCycles = 100
+                while (job.transformer.getProgress(progressHolder) != Transformer.PROGRESS_STATE_NOT_STARTED && pollCycles < maxCycles) {
+                    try {
+                        Thread.sleep(10)
+                    } catch (_: InterruptedException) {}
+                    pollCycles++
+                }
+
                 // Release all cached overlay bitmaps from memory
                 job.overlays.forEach { it.release() }
 
-                // Safe grace period allowing background threads to close native file descriptors
-                try {
-                    Thread.sleep(80)
-                } catch (_: InterruptedException) {}
-
+                // Explicit verification that native file handles are released before deleting files
                 if (job.outputFile.exists()) {
-                    job.outputFile.delete()
+                    var fileReleased = false
+                    var fileCycles = 0
+                    while (!fileReleased && fileCycles < maxCycles) {
+                        try {
+                            java.io.RandomAccessFile(job.outputFile, "rw").use { raf ->
+                                val lock = raf.channel.tryLock()
+                                if (lock != null) {
+                                    lock.release()
+                                    fileReleased = true
+                                }
+                            }
+                        } catch (_: Exception) {
+                            try {
+                                Thread.sleep(10)
+                            } catch (_: InterruptedException) {}
+                        }
+                        fileCycles++
+                    }
+
+                    try {
+                        job.outputFile.delete()
+                    } catch (_: Exception) {}
                 }
 
                 job.state.set(ExportJobContext.STATE_CANCELLED)
