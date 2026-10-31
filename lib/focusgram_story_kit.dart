@@ -62,3 +62,30 @@ export 'editor/panels/rich_text_editor_sheet.dart';
 export 'editor/panels/sticker_picker_sheet.dart';
 export 'editor/panels/layer_manager_sheet.dart';
 export 'editor/panels/template_picker_sheet.dart';
+
+// Phase 5 — Video & Animation Models
+export 'models/video_payload.dart';
+export 'models/overlay_animation.dart';
+export 'models/story_kit_configuration.dart';
+
+// Phase 5 — Timeline Engine & Transitions
+export 'timeline/timeline_state.dart';
+export 'timeline/timeline_controller.dart';
+export 'timeline/timeline_sync_coordinator.dart';
+export 'timeline/video_transition_math.dart';
+
+// Phase 5 — Canvas Video & Animated Overlays
+export 'editor/canvas/canvas_video_view.dart';
+export 'editor/canvas/animated_element_box.dart';
+
+// Phase 5 — Video Editor Panels
+export 'editor/panels/timeline_scrubber.dart';
+export 'editor/panels/animation_picker_sheet.dart';
+export 'editor/panels/audio_settings_sheet.dart';
+export 'editor/panels/cover_picker_sheet.dart';
+
+// Phase 5 — Video Export Pipeline & Jobs
+export 'export/export_error.dart';
+export 'export/video_export_job.dart';
+export 'export/video_export_adapter.dart';
+export 'export/story_video_exporter.dart';
