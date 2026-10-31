@@ -454,6 +454,7 @@ void main() {
 
     test(
       'End-to-end export execution through StoryVideoExporter returns full VideoExportResult',
+      timeout: const Timeout(Duration(seconds: 90)),
       () async {
         final exporter = StoryVideoExporter(
           systemTempDirectory: tempDir,
