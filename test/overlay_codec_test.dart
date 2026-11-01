@@ -5,7 +5,7 @@ import 'package:focusgram_story_kit/overlays/overlay_codec.dart';
 void main() {
   group('decodeStoryOverlay', () {
     test('poll round-trips with options and allowMultiple', () {
-      final overlay = PollOverlay(
+      const overlay = PollOverlay(
         id: 'p1',
         normalizedDx: 0.5,
         normalizedDy: 0.4,
