@@ -89,8 +89,13 @@ class EditorController extends ChangeNotifier {
   /// Switches the active slide to [pageId].
   void selectPage(String pageId) {
     if (_state.activePageId == pageId) return;
-    _state = _state.copyWith(activePageId: pageId, clearSelectedElement: true);
     final targetPage = _project.getPage(pageId);
+    final isVideo = targetPage?.backgroundAsset?.isVideo == true;
+    _state = _state.copyWith(
+      activePageId: pageId,
+      clearSelectedElement: true,
+      showTimeline: isVideo ? true : _state.showTimeline,
+    );
     if (targetPage != null && _timelineController != null) {
       _timelineController!.setTotalDuration(targetPage.duration);
       _timelineController!.setTrimRange(targetPage.videoTrimRange);
@@ -316,6 +321,28 @@ class EditorController extends ChangeNotifier {
     // Select adjacent page
     final newIndex = (currentIndex - 1).clamp(0, _project.pages.length - 1);
     selectPage(_project.pages[newIndex].id);
+  }
+
+  /// Reorders a page from [oldIndex] to [newIndex].
+  void reorderPage(int oldIndex, int newIndex) {
+    execute(ReorderPageCommand(oldIndex: oldIndex, newIndex: newIndex));
+  }
+
+  /// Appends a new page with a background media asset (photo or video).
+  void addMediaPage(
+    StoryMediaAsset asset, {
+    Duration duration = const Duration(seconds: 5),
+  }) {
+    final isVideo = asset.isVideo;
+    final newPage = StoryPage(
+      id:
+          'page_${DateTime.now().millisecondsSinceEpoch}_${_project.pages.length + 1}',
+      duration: isVideo ? duration : const Duration(seconds: 5),
+      backgroundAsset: asset,
+      videoTrimRange: isVideo ? VideoTrimRange(end: duration) : null,
+    );
+    execute(AddPageCommand(page: newPage));
+    selectPage(newPage.id);
   }
 
   /// Sets the background color or media asset for the active page.

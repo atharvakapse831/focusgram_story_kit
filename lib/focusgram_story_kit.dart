@@ -90,3 +90,4 @@ export 'export/video_export_job.dart';
 export 'export/video_export_adapter.dart';
 export 'export/story_video_overlay_rasterizer.dart';
 export 'export/story_video_exporter.dart';
+export 'export/story_project_exporter.dart';

@@ -277,6 +277,47 @@ class DuplicatePageCommand extends EditorCommand {
   }
 }
 
+/// Reorders a page from [oldIndex] to [newIndex] within the project.
+class ReorderPageCommand extends EditorCommand {
+  const ReorderPageCommand({required this.oldIndex, required this.newIndex});
+
+  final int oldIndex;
+  final int newIndex;
+
+  @override
+  String get description => 'Reorder Page';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    if (oldIndex < 0 ||
+        oldIndex >= project.pages.length ||
+        newIndex < 0 ||
+        newIndex >= project.pages.length ||
+        oldIndex == newIndex) {
+      return project;
+    }
+    final pages = List<StoryPage>.from(project.pages);
+    final page = pages.removeAt(oldIndex);
+    pages.insert(newIndex, page);
+    return project.copyWith(pages: pages);
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    if (oldIndex < 0 ||
+        oldIndex >= project.pages.length ||
+        newIndex < 0 ||
+        newIndex >= project.pages.length ||
+        oldIndex == newIndex) {
+      return project;
+    }
+    final pages = List<StoryPage>.from(project.pages);
+    final page = pages.removeAt(newIndex);
+    pages.insert(oldIndex, page);
+    return project.copyWith(pages: pages);
+  }
+}
+
 /// Changes the background color or media asset of a page.
 class SetPageBackgroundCommand extends EditorCommand {
   const SetPageBackgroundCommand({
