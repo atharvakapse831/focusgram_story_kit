@@ -166,6 +166,10 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
     for (final el in _controller.activePage.elements) {
       if (el.type == StoryElementType.image) return el.id;
     }
+    if (_controller.activePage.backgroundAsset != null &&
+        !_controller.activePage.backgroundAsset!.isVideo) {
+      return 'background';
+    }
     return null;
   }
 

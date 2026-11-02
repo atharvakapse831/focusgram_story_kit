@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'gradient_background.dart';
+import 'image_adjustments.dart';
 import 'story_element.dart';
 import 'story_media_asset.dart';
 import 'video_payload.dart';
@@ -14,6 +15,7 @@ class StoryPage {
     this.backgroundColor = Colors.black,
     this.backgroundGradient,
     this.backgroundAsset,
+    this.imageAdjustments,
     this.videoTrimRange,
     this.audioPolicy,
     this.coverTimestamp,
@@ -34,6 +36,9 @@ class StoryPage {
 
   /// Optional background image/asset.
   final StoryMediaAsset? backgroundAsset;
+
+  /// Optional non-destructive color adjustments and filters for background image.
+  final ImageAdjustments? imageAdjustments;
 
   /// Optional trim boundaries for background video.
   final VideoTrimRange? videoTrimRange;
@@ -70,6 +75,8 @@ class StoryPage {
     bool clearBackgroundGradient = false,
     StoryMediaAsset? backgroundAsset,
     bool clearBackgroundAsset = false,
+    ImageAdjustments? imageAdjustments,
+    bool clearImageAdjustments = false,
     VideoTrimRange? videoTrimRange,
     bool clearVideoTrimRange = false,
     VideoAudioPolicy? audioPolicy,
@@ -90,6 +97,10 @@ class StoryPage {
           clearBackgroundAsset
               ? null
               : (backgroundAsset ?? this.backgroundAsset),
+      imageAdjustments:
+          clearImageAdjustments
+              ? null
+              : (imageAdjustments ?? this.imageAdjustments),
       videoTrimRange:
           clearVideoTrimRange ? null : (videoTrimRange ?? this.videoTrimRange),
       audioPolicy: clearAudioPolicy ? null : (audioPolicy ?? this.audioPolicy),
@@ -106,6 +117,8 @@ class StoryPage {
     if (backgroundGradient != null)
       'backgroundGradient': backgroundGradient!.toJson(),
     if (backgroundAsset != null) 'backgroundAsset': backgroundAsset!.toJson(),
+    if (imageAdjustments != null)
+      'imageAdjustments': imageAdjustments!.toJson(),
     if (videoTrimRange != null) 'videoTrimRange': videoTrimRange!.toJson(),
     if (audioPolicy != null) 'audioPolicy': audioPolicy!.toJson(),
     if (coverTimestamp != null)
@@ -134,6 +147,12 @@ class StoryPage {
           json['backgroundAsset'] != null
               ? StoryMediaAsset.fromJson(
                 Map<String, dynamic>.from(json['backgroundAsset'] as Map),
+              )
+              : null,
+      imageAdjustments:
+          json['imageAdjustments'] != null
+              ? ImageAdjustments.fromJson(
+                Map<String, dynamic>.from(json['imageAdjustments'] as Map),
               )
               : null,
       videoTrimRange:
@@ -171,6 +190,7 @@ class StoryPage {
           backgroundColor.toARGB32() == other.backgroundColor.toARGB32() &&
           backgroundGradient == other.backgroundGradient &&
           backgroundAsset == other.backgroundAsset &&
+          imageAdjustments == other.imageAdjustments &&
           videoTrimRange == other.videoTrimRange &&
           audioPolicy == other.audioPolicy &&
           coverTimestamp == other.coverTimestamp &&
@@ -183,6 +203,7 @@ class StoryPage {
     backgroundColor,
     backgroundGradient,
     backgroundAsset,
+    imageAdjustments,
     videoTrimRange,
     audioPolicy,
     coverTimestamp,

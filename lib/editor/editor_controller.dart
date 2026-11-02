@@ -17,8 +17,12 @@ import 'editor_state.dart';
 /// Implements [ChangeNotifier] to drive reactive UI updates while isolating
 /// document state ([StoryProject]) from ephemeral interaction state ([EditorState]).
 class EditorController extends ChangeNotifier {
-  EditorController({StoryProject? initialProject, CommandHistory? history})
-    : _history = history ?? CommandHistory() {
+  EditorController({
+    StoryProject? initialProject,
+    CommandHistory? history,
+    StoryTimelineController? timelineController,
+  }) : _history = history ?? CommandHistory(),
+       _timelineController = timelineController {
     if (initialProject != null && initialProject.pages.isNotEmpty) {
       _project = initialProject;
       _state = EditorState(activePageId: initialProject.pages.first.id);
@@ -165,6 +169,7 @@ class EditorController extends ChangeNotifier {
     _project = _history.undo(_project);
     // Ensure active page ID and selection remain valid
     _sanitizeSelection();
+    _syncTimelineWithActivePage();
     notifyListeners();
   }
 
@@ -173,6 +178,7 @@ class EditorController extends ChangeNotifier {
     if (!_history.canRedo) return;
     _project = _history.redo(_project);
     _sanitizeSelection();
+    _syncTimelineWithActivePage();
     notifyListeners();
   }
 
@@ -411,11 +417,27 @@ class EditorController extends ChangeNotifier {
     );
   }
 
+  /// Updates background image adjustments for the active page.
+  void updatePageImageAdjustments(ImageAdjustments? newAdjustments) {
+    final current = activePage;
+    execute(
+      UpdatePageImageAdjustmentsCommand(
+        pageId: current.id,
+        previousAdjustments: current.imageAdjustments,
+        newAdjustments: newAdjustments,
+      ),
+    );
+  }
+
   /// Updates image adjustments (brightness, contrast, saturation, filters).
   void updateImageAdjustments(
-    String elementId,
+    String? elementId,
     ImageAdjustments newAdjustments,
   ) {
+    if (elementId == null || elementId == 'background') {
+      updatePageImageAdjustments(newAdjustments);
+      return;
+    }
     final el = activePage.getElement(elementId);
     if (el == null || el.payload is! ImageElementPayload) return;
     final payload = el.payload as ImageElementPayload;
@@ -552,6 +574,7 @@ class EditorController extends ChangeNotifier {
         previousPage: page,
       ),
     );
+    _syncTimelineWithActivePage();
   }
 
   @override
@@ -563,6 +586,15 @@ class EditorController extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // Internal Helpers
   // ---------------------------------------------------------------------------
+
+  void _syncTimelineWithActivePage() {
+    if (_timelineController != null) {
+      final page = activePage;
+      _timelineController!.setTotalDuration(page.duration);
+      _timelineController!.setTrimRange(page.videoTrimRange);
+      _timelineController!.seekTo(page.videoTrimRange?.start ?? Duration.zero);
+    }
+  }
 
   void _sanitizeSelection() {
     if (_project.getPage(_state.activePageId) == null) {

@@ -1,10 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../../models/element_payloads.dart';
 import '../../models/story_canvas_spec.dart';
 import '../../models/story_element.dart';
+import '../../models/story_media_asset.dart';
 import '../../models/story_page.dart';
 import '../../models/story_project.dart';
 import 'export_result.dart';
@@ -46,42 +50,156 @@ class StoryStillImageExporter {
     final height = targetHeight ?? canvasSpec.height.toInt();
     final canvasSize = Size(width.toDouble(), height.toDouble());
 
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
+    ui.Image? bgImage;
+    final elementImages = <String, ui.Image>{};
 
-    // 1. Paint background (gradient or solid color)
-    final bgRect = Rect.fromLTWH(0, 0, canvasSize.width, canvasSize.height);
-    if (page.backgroundGradient != null) {
-      final gradient = page.backgroundGradient!.toGradient();
-      final bgPaint = Paint()..shader = gradient.createShader(bgRect);
-      canvas.drawRect(bgRect, bgPaint);
-    } else {
-      final bgPaint = Paint()..color = page.backgroundColor;
-      canvas.drawRect(bgRect, bgPaint);
+    try {
+      // Preload background image if non-video
+      if (page.backgroundAsset != null && !page.backgroundAsset!.isVideo) {
+        bgImage = await _loadUiImage(page.backgroundAsset);
+      }
+
+      // Preload image elements
+      for (final el in page.elements) {
+        if (el.payload is ImageElementPayload) {
+          final imgPayload = el.payload as ImageElementPayload;
+          final img = await _loadUiImage(imgPayload.asset);
+          if (img != null) {
+            elementImages[el.id] = img;
+          }
+        }
+      }
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      // 1. Paint background (gradient or solid color)
+      final bgRect = Rect.fromLTWH(0, 0, canvasSize.width, canvasSize.height);
+      if (page.backgroundGradient != null) {
+        final gradient = page.backgroundGradient!.toGradient();
+        final bgPaint = Paint()..shader = gradient.createShader(bgRect);
+        canvas.drawRect(bgRect, bgPaint);
+      } else {
+        final bgPaint = Paint()..color = page.backgroundColor;
+        canvas.drawRect(bgRect, bgPaint);
+      }
+
+      // Paint background photo if present
+      if (bgImage != null) {
+        _drawImageToRect(
+          canvas: canvas,
+          image: bgImage,
+          dstRect: bgRect,
+          fit: BoxFit.cover,
+          adjustments: page.imageAdjustments,
+        );
+      }
+
+      // 2. Paint visible elements in deterministic z-order
+      for (final el in page.sortedElements) {
+        if (!el.isVisible) continue;
+        _paintElement(canvas, el, canvasSize, elementImages);
+      }
+
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(width, height);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      final bytes = byteData?.buffer.asUint8List() ?? Uint8List(0);
+
+      return StillImageExportResult(
+        pageId: page.id,
+        bytes: bytes,
+        width: width,
+        height: height,
+        format: 'png',
+        duration: page.duration,
+      );
+    } finally {
+      bgImage?.dispose();
+      for (final img in elementImages.values) {
+        img.dispose();
+      }
     }
-
-    // 2. Paint visible elements in deterministic z-order
-    for (final el in page.sortedElements) {
-      if (!el.isVisible) continue;
-      _paintElement(canvas, el, canvasSize);
-    }
-
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(width, height);
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    final bytes = byteData?.buffer.asUint8List() ?? Uint8List(0);
-
-    return StillImageExportResult(
-      pageId: page.id,
-      bytes: bytes,
-      width: width,
-      height: height,
-      format: 'png',
-      duration: page.duration,
-    );
   }
 
-  void _paintElement(Canvas canvas, StoryElement element, Size canvasSize) {
+  Future<ui.Image?> _loadUiImage(StoryMediaAsset? asset) async {
+    if (asset == null || asset.uri.isEmpty) return null;
+    try {
+      Uint8List? bytes;
+      if (asset.sourceType == StoryMediaSourceType.file) {
+        final file = File(asset.uri);
+        if (await file.exists()) {
+          bytes = await file.readAsBytes();
+        }
+      } else if (asset.sourceType == StoryMediaSourceType.asset) {
+        final byteData = await rootBundle.load(asset.uri);
+        bytes = byteData.buffer.asUint8List();
+      } else if (asset.sourceType == StoryMediaSourceType.memory ||
+          asset.sourceType == StoryMediaSourceType.network) {
+        if (asset.uri.startsWith('data:')) {
+          final base64Str = asset.uri.split(',').last;
+          bytes = base64Decode(base64Str);
+        } else {
+          final file = File(asset.uri);
+          if (await file.exists()) {
+            bytes = await file.readAsBytes();
+          }
+        }
+      }
+      if (bytes != null && bytes.isNotEmpty) {
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        return frame.image;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  void _drawImageToRect({
+    required Canvas canvas,
+    required ui.Image image,
+    required Rect dstRect,
+    BoxFit fit = BoxFit.cover,
+    ImageAdjustments? adjustments,
+  }) {
+    final srcSize = Size(image.width.toDouble(), image.height.toDouble());
+    final fittedSizes = applyBoxFit(fit, srcSize, dstRect.size);
+    final srcRect = Alignment.center.inscribe(
+      fittedSizes.source,
+      Offset.zero & srcSize,
+    );
+    final targetRect = Alignment.center.inscribe(
+      fittedSizes.destination,
+      dstRect,
+    );
+
+    final paint = Paint();
+    if (adjustments != null && adjustments.hasAdjustments) {
+      paint.colorFilter = ColorFilter.matrix(adjustments.toColorMatrix());
+    }
+
+    final flipH = adjustments?.isFlippedHorizontally ?? false;
+    final flipV = adjustments?.isFlippedVertically ?? false;
+
+    if (flipH || flipV) {
+      canvas.save();
+      canvas.translate(targetRect.center.dx, targetRect.center.dy);
+      canvas.scale(flipH ? -1.0 : 1.0, flipV ? -1.0 : 1.0);
+      canvas.translate(-targetRect.center.dx, -targetRect.center.dy);
+      canvas.drawImageRect(image, srcRect, targetRect, paint);
+      canvas.restore();
+    } else {
+      canvas.drawImageRect(image, srcRect, targetRect, paint);
+    }
+  }
+
+  void _paintElement(
+    Canvas canvas,
+    StoryElement element,
+    Size canvasSize,
+    Map<String, ui.Image> elementImages,
+  ) {
     final transform = element.transform;
     final center = transform.toScreenCenter(canvasSize);
     final size = transform.toScreenSize(canvasSize);
@@ -106,6 +224,19 @@ class StoryStillImageExporter {
     final payload = element.payload;
     if (payload is TextElementPayload) {
       _paintText(canvas, payload, size);
+    } else if (payload is ImageElementPayload) {
+      final img = elementImages[element.id];
+      if (img != null) {
+        _drawImageToRect(
+          canvas: canvas,
+          image: img,
+          dstRect: Rect.fromLTWH(0, 0, size.width, size.height),
+          fit: payload.fit,
+          adjustments: payload.adjustments,
+        );
+      } else {
+        _paintGenericPlaceholder(canvas, payload, size);
+      }
     } else if (payload is CardElementPayload) {
       _paintCard(canvas, payload, size);
     } else if (payload is DrawingElementPayload) {

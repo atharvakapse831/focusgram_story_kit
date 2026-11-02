@@ -138,23 +138,26 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
       );
     }
 
+    Widget img;
     switch (asset.sourceType) {
       case StoryMediaSourceType.file:
-        return Image.file(
+        img = Image.file(
           File(asset.uri),
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         );
+        break;
       case StoryMediaSourceType.asset:
-        return Image.asset(
+        img = Image.asset(
           asset.uri,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         );
+        break;
       case StoryMediaSourceType.network:
       case StoryMediaSourceType.memory:
         if (asset.uri.isEmpty) return const SizedBox.shrink();
-        return CachedNetworkImage(
+        img = CachedNetworkImage(
           imageUrl: asset.uri,
           fit: BoxFit.cover,
           placeholder:
@@ -163,7 +166,29 @@ class _StoryEditorCanvasState extends State<StoryEditorCanvas> {
               ),
           errorWidget: (_, __, ___) => const SizedBox.shrink(),
         );
+        break;
     }
+
+    if (page.imageAdjustments?.hasAdjustments == true) {
+      img = ColorFiltered(
+        colorFilter: ColorFilter.matrix(page.imageAdjustments!.toColorMatrix()),
+        child: img,
+      );
+      if (page.imageAdjustments!.isFlippedHorizontally ||
+          page.imageAdjustments!.isFlippedVertically) {
+        img = Transform(
+          transform: Matrix4.diagonal3Values(
+            page.imageAdjustments!.isFlippedHorizontally ? -1.0 : 1.0,
+            page.imageAdjustments!.isFlippedVertically ? -1.0 : 1.0,
+            1.0,
+          ),
+          alignment: Alignment.center,
+          child: img,
+        );
+      }
+    }
+
+    return img;
   }
 
   Widget _buildPositionedElement(StoryElement element, Size canvasSize) {

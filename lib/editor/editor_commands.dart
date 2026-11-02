@@ -630,6 +630,42 @@ class UpdateImageAdjustmentsCommand extends EditorCommand {
   }
 }
 
+/// Updates background image adjustments for an entire page with undo/redo support.
+class UpdatePageImageAdjustmentsCommand extends EditorCommand {
+  const UpdatePageImageAdjustmentsCommand({
+    required this.pageId,
+    required this.previousAdjustments,
+    required this.newAdjustments,
+  });
+
+  final String pageId;
+  final ImageAdjustments? previousAdjustments;
+  final ImageAdjustments? newAdjustments;
+
+  @override
+  String get description => 'Update page image adjustments';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        imageAdjustments: newAdjustments,
+        clearImageAdjustments: newAdjustments == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        imageAdjustments: previousAdjustments,
+        clearImageAdjustments: previousAdjustments == null,
+      );
+    });
+  }
+}
+
 /// Applies a preset template to the active page, saving prior page state for undo.
 class ApplyTemplateCommand extends EditorCommand {
   const ApplyTemplateCommand({
