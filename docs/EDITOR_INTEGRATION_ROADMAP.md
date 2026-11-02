@@ -1,9 +1,9 @@
 # FocusGram Story Kit — Editor Integration Roadmap & Execution Plan
 
-**Status:** Proposed Roadmap & Phase Gate Specification  
+**Status:** Updated & Revalidated Roadmap Specification  
 **Repository:** `atharvakapse831/focusgram_story_kit`  
 **Branch:** `main`  
-**Date:** 2026-11-01  
+**Date:** 2026-11-02  
 **Target Milestone:** Phased delivery of unified Image and Video StoryEditor  
 
 ---
@@ -13,7 +13,7 @@
 This roadmap defines the engineering milestones, dependency governance, testing gates, and verification criteria required to implement the **Unified StoryEditor Architecture** in `focusgram_story_kit`.
 
 The integration sequence is organized into 8 sequential milestones designed to guarantee:
-1. Strict isolation of third-party dependencies (`pro_image_editor`, `easy_video_editor`).
+1. Strict isolation of third-party dependencies (`pro_image_editor`, `easy_video_editor`, `pro_video_editor`).
 2. Preservation of the interactive metadata overlay contract (`StoryOverlay`).
 3. Lifecycle and cancellation safety across Android and iOS platforms.
 4. Deterministic multi-page mixed-media story export.
@@ -24,9 +24,10 @@ The integration sequence is organized into 8 sequential milestones designed to g
 
 | Candidate Package | Decision | Operational Scope | Maintenance & Risk Rationale |
 |---|---|---|---|
-| **`pro_image_editor: ^14.23.0`** | **DEFERRED / REJECTED AS CORE ENGINE** | May only be invoked as an optional modal pre-processor for image cropping and color tuning. | Flattens interactive overlays into pixels on export. Incompatible with FocusGram's interactive sticker metadata model. Requires custom overlay engine. |
-| **`easy_video_editor: ^0.1.7`** | **DEFERRED / REJECTED AS COMPLETE VIDEO ENGINE** | Headless video trimming and scaling utility only. | Completely lacks overlay compositing and cancellation APIs. Cannot burn text/stickers into video or stop runaway 4K exports. |
-| **`video_player: ^2.9.2`** | **ADOPTED / RETAINED** | In-editor video preview playback and timeline scrubbing. | Established first-party Flutter plugin with reliable texture rendering. |
+| **`pro_image_editor: ^14.23.0`** | **ADOPT BEHIND ADAPTER** | Internal modal tool for advanced image cropping, filter presets, and color tuning. | Visual layers are flattened into background pixels on export, which is appropriate for visual media. Interactive metadata (`StoryOverlay`) is intercepted and preserved as structured JSON. |
+| **`easy_video_editor: ^0.1.7`** | **ADOPT BEHIND ADAPTER** | Headless video trimming, scaling, speed control, and compression. | Lightweight native Media3/AVFoundation transcode. Cancellation (`cancel()`) is supported but requires strict concurrency guarding. Lacks overlay compositing and audio mixing. |
+| **`pro_video_editor: ^2.50.1`** | **DEFER UNTIL DART 3.12+** | Advanced video composition and audio ducking engine. | Highly capable native rendering engine, but requires `sdk: '>=3.12.0'`, conflicting with Story Kit's `sdk: ^3.5.0` and Dart 3.5.x environment. Retained as a future adapter target. |
+| **`video_player: ^2.9.2`** | **ADOPT / RETAIN** | In-editor video preview playback and timeline scrubbing. | Established first-party Flutter plugin with reliable texture rendering. |
 | **In-House Native Compositor** | **MANDATORY** | Media3 (Android) and AVFoundation (iOS) timestamp-synchronized overlay compositing. | Only viable architecture that delivers video export with burned-in animated text, stickers, drawings, and shapes without losing interactive data in the viewer. |
 
 ---
@@ -126,14 +127,14 @@ Milestone 8: Hardening, Verification & Host Integration
 **Objective:** Integrate image cropping/tuning tools and build offscreen still-image rasterization.
 
 - **Tasks**:
-  1. Implement `ProImageEditorAdapter` (wrapping `pro_image_editor` sub-modules):
-     - Provides modal cropping sheet with 9:16, 1:1, 4:5, and custom aspect ratios.
-     - Provides color tuning (brightness, contrast, saturation) and filter matrix presets.
-     - Returns cropped/adjusted image bytes to the temporary workspace without altering original source file.
+  1. Implement `ImageEditorAdapter` contract:
+     - Supports modal cropping sheet with 9:16, 1:1, 4:5, and custom aspect ratios.
+     - Supports color tuning (brightness, contrast, saturation) and filter matrix presets.
+     - Can delegate internally to `pro_image_editor` sub-modules or in-house shaders.
   2. Implement `StoryStillImageExporter`:
-     - Uses Flutter's `PictureRecorder` and `Canvas` to render background image + Layer 1 visual overlays at high resolution (1080x1920).
+     - Uses Flutter's `PictureRecorder` and `Canvas` to render background image + Tier 1 visual overlays at high resolution (1080x1920).
      - Encodes to PNG/JPEG inside a background Dart isolate (`compute`).
-  3. For FocusGram story publishing, preserve Layer 2 interactive overlays as metadata; for standalone gallery export, composite visual representations.
+  3. For FocusGram story publishing, preserve Tier 2 interactive overlays as metadata; for standalone gallery export, composite visual representations.
 - **Exit Criteria**:
   - Exported PNG files match canvas dimensions (1080x1920) with crisp typography and anti-aliased drawings.
   - Original camera photos remain unmodified in device gallery.
@@ -152,10 +153,10 @@ Milestone 8: Hardening, Verification & Host Integration
      - Displays filmstrip thumbnails generated at 1-second intervals.
      - Draggable trim start and trim end handles with millisecond precision.
      - Real-time playhead scrubber synchronized to `video_player`.
-  3. Implement `EasyVideoEditorAdapter` (wrapping `easy_video_editor: 0.1.7`):
-     - Executes native trimming (`trim(startTimeMs, endTimeMs)`).
-     - Executes video scaling and aspect ratio cropping.
-     - Wraps native export with timeout and error mapping.
+  3. Implement `VideoEditorAdapter` contract:
+     - Headless trimming (`trim(startTimeMs, endTimeMs)`).
+     - Headless video scaling and aspect ratio cropping.
+     - Can delegate to `easy_video_editor: 0.1.7` or in-house native channels.
 - **Exit Criteria**:
   - Widget tests verify timeline trimming updates video playback bounds accurately.
   - Rapid play/pause/seek operations cause zero controller leaks or crashes.
@@ -251,7 +252,7 @@ Milestone 8: Hardening, Verification & Host Integration
 | Risk ID | Description | Severity | Likelihood | Mitigation Strategy | Fallback Plan |
 |---|---|---|---|---|---|
 | **TR-1** | `pro_image_editor` breaking API changes across minor versions | High | Medium | Strict adapter pattern (`ImageEditorAdapter`). Package is never exposed publicly. | Swap with lightweight custom Flutter canvas cropping/filter module. |
-| **TR-2** | `easy_video_editor` lacks cancellation and overlay compositing | Critical | High | Do not rely on `easy_video_editor` for overlays. Use dedicated native compositor with Media3 / AVFoundation. | Implement full native plugin directly in Story Kit or host app. |
-| **TR-3** | OOM crashes during high-resolution multi-page editing | High | High | Enforce 1080x1920 downsampling on import. Evict offscreen page textures from memory. | Restrict simultaneous active page previews; enforce maximum 10 pages per story. |
-| **TR-4** | Audio desynchronization in trimmed videos | Medium | Medium | Force audio re-encoding with constant frame rate (CFR) and fixed 44.1kHz/48kHz sample rate. | Mute original audio or warn user if container has variable frame rate (VFR). |
-| **TR-5** | Android Media3 hardware codec incompatibility on budget devices | High | Medium | Check `MediaCodecList` capabilities before configuring Transformer. Fall back to baseline H.264 profile. | Provide software encoding fallback or reduce export resolution to 720p. |
+| **TR-2** | `easy_video_editor` lacks overlay compositing | Critical | High | Do not rely on `easy_video_editor` for overlays. Use dedicated native compositor with Media3 / AVFoundation. | Implement full native plugin directly in Story Kit or host app. |
+| **TR-3** | `pro_video_editor` requires Dart 3.12+ | High | High | Defer adoption until host app upgrades Dart SDK. | Use lightweight native Media3/AVFoundation channel in the interim. |
+| **TR-4** | OOM crashes during high-resolution multi-page editing | High | High | Enforce 1080x1920 downsampling on import. Evict offscreen page textures from memory. | Restrict simultaneous active page previews; enforce maximum 10 pages per story. |
+| **TR-5** | Audio desynchronization in trimmed videos | Medium | Medium | Force audio re-encoding with constant frame rate (CFR) and fixed 44.1kHz/48kHz sample rate. | Mute original audio or warn user if container has variable frame rate (VFR). |

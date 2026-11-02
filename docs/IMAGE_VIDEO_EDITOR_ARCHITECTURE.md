@@ -1,27 +1,27 @@
 # FocusGram Story Kit — Unified Image & Video Editing Engine Architecture
 
-**Status:** Proposed Architecture Specification  
+**Status:** Updated & Revalidated Architecture Specification  
 **Repository:** `atharvakapse831/focusgram_story_kit`  
 **Branch:** `main`  
-**Date:** 2026-11-01  
-**Architecture Version:** 1.0.0-draft  
+**Date:** 2026-11-02  
+**Architecture Version:** 1.1.0  
 
 ---
 
 ## 1. Executive Summary & Design Vision
 
-FocusGram requires a unified, creator-grade **StoryEditor** that handles both still photo stories and high-definition video stories within a single, cohesive user experience. 
+FocusGram Story Kit requires an Instagram-class Story Creation Studio that treats photos and videos as equal, first-class citizens in single-page and multi-page stories.
 
 The editor must support:
 - Single-page and multi-page mixed-media stories (e.g., Page 1: Photo, Page 2: 15s Video, Page 3: Photo with drawings, Page 4: Video with music).
 - Photo editing: crop, rotate, flip, color tuning (brightness, contrast, saturation), and aesthetic filters.
 - Video editing: timeline scrubbing, millisecond-accurate trimming, clip splitting, playback speed, and audio/music mixing.
-- Unified composition: rich typography, stickers, emojis, freehand drawings, vector shapes, layer z-ordering, and animated transforms.
-- **Interactive metadata overlays**: polls, quizzes, sliders, questions, countdowns, links, mentions, and FocusGram post/note share cards that remain interactive for viewers.
+- Unified visual composition: rich typography, stickers, emojis, freehand drawings, vector shapes, layer z-ordering, and animated transforms.
+- **Interactive metadata overlays**: polls, quizzes, sliders, questions, countdowns, links, mentions, and FocusGram share cards that remain interactive for viewers.
 - High-fidelity export: crisp still-image rendering for photos and hardware-accelerated Media3/AVFoundation video encoding with timestamp-synchronized animated overlay compositing.
 
 ### Core Architectural Mandate: Zero Third-Party Leakage
-Neither `pro_image_editor`, `easy_video_editor`, nor any platform-specific SDK shall ever be exposed in the public Story Kit API. All third-party packages must live strictly behind pluggable internal adapter interfaces. If an underlying package is replaced, deprecated, or swapped for an in-house engine in a future phase, consumer applications (like FocusGram Mobile) require **zero code changes**.
+Neither `pro_image_editor`, `easy_video_editor`, `pro_video_editor`, nor any platform-specific SDK shall ever be exposed in the public Story Kit API. All third-party packages live strictly behind pluggable internal adapter interfaces. If an underlying package is replaced, deprecated, or swapped in a future phase, consumer applications (like FocusGram Mobile) require **zero code changes**.
 
 ```
                         ┌──────────────────────────────────────────────┐
@@ -52,7 +52,8 @@ Neither `pro_image_editor`, `easy_video_editor`, nor any platform-specific SDK s
 │   ┌──────────────────────────┐    ┌──────────────────────────┐    ┌─────────────────────┐   │
 │   │    ImageEditorAdapter    │    │ Unified Interactive      │    │ VideoEditorAdapter  │   │
 │   │       (Pluggable)        │    │ Canvas & Overlay Engine  │    │     (Pluggable)     │   │
-│   │  [pro_image_editor sub]  │    │ (Vector + Interactive)   │    │ [easy_video_editor] │   │
+│   │  [pro_image_editor sub]  │    │ (Vector + Interactive)   │    │ [easy_video_editor/ │   │
+│   │                          │    │                          │    │  pro_video_editor]  │   │
 │   └──────────────────────────┘    └──────────────────────────┘    └──────────┬──────────┘   │
 │                                                                              │              │
 │                                                                              ▼              │
@@ -70,7 +71,7 @@ Neither `pro_image_editor`, `easy_video_editor`, nor any platform-specific SDK s
 
 The following 9 rules govern the entire StoryEditor design:
 
-1. **Zero Third-Party Exposure**: Never import or return types from `pro_image_editor`, `easy_video_editor`, or `video_player` in the public API.
+1. **Zero Third-Party Exposure**: Never import or return types from `pro_image_editor`, `easy_video_editor`, `pro_video_editor`, or `video_player` in the public API.
 2. **Pluggable & Replaceable Engine Adapters**: Image and video processing pipelines are accessed strictly through abstract interfaces (`ImageEditorAdapter`, `VideoEditorAdapter`, `StoryVideoExportAdapter`).
 3. **Engine-Independent Composition Model**: The document model (`StoryCompositionModel` / `StoryProject`) owns all page, layer, coordinate, and metadata definitions. No engine-specific data models are persisted.
 4. **Preview vs Export Separation**: Real-time canvas preview and video playback use high-performance Flutter UI widgets (`video_player` texture and Flutter `CustomPainter`), completely decoupled from headless export transcoders.
@@ -78,7 +79,7 @@ The following 9 rules govern the entire StoryEditor design:
 6. **Deterministic Temporary File Lifecycle**: All intermediate and exported files reside in a dedicated, isolated temporary workspace (`Directory('${tempDir.path}/focusgram_story_${sessionId}')`). The session explicitly owns and cleans up these files upon completion, cancellation, or error.
 7. **Explicit Asynchronous Cancellation & Progress**: All heavy operations (import, transcode, compositing, export) accept a `StoryCancellationToken` and emit structured `StoryExportProgress` with phase and fractional percentage.
 8. **Concurrency Safety & Mutex Guarding**: Parallel export calls on the same session are rejected. Mutex locks prevent concurrent writes to identical output paths.
-9. **Forward Extensibility**: The architecture supports adding future engines (e.g. custom WebGL effects, AI background matting, or cloud renderers) without breaking existing consumers.
+9. **Forward Extensibility**: The architecture supports adding future engines (e.g. `pro_video_editor` once Dart 3.12+ is standard, custom WebGL effects, AI background matting, or cloud renderers) without breaking existing consumers.
 
 ---
 
@@ -110,12 +111,12 @@ Abstracts video manipulation tasks:
 - **`adjustSpeed()`**: Modifies playback rate (0.5x to 2.0x).
 - **`extractThumbnail()`**: Generates timeline scrubber thumbnails at specified timestamps.
 - **`extractAudio()` / `removeAudio()`**: Strips or extracts raw audio.
-- **Implementation Strategy**: Delegates headless trimming and scaling to `easy_video_editor: 0.1.7` (or in-house Media3/AVFoundation plugin).
+- **Implementation Strategy**: Delegates headless trimming and scaling to `easy_video_editor: 0.1.7`, `pro_video_editor: 2.50.1` (when environment permits), or in-house Media3/AVFoundation native channel.
 
 ### 3.5 StoryExportService & Native Overlay Compositor
 The master export coordinator:
 - Inspects every page in the `StoryCompositionModel`.
-- Routes still photo pages to the offscreen image renderer.
+- Routes still photo pages to the offscreen image renderer (`StoryStillImageExporter`).
 - Routes video pages to the native video compositor:
   - Phase 1: Video transcoding (trim, scale, speed via `VideoEditorAdapter`).
   - Phase 2: Timestamp-aware overlay compositing (burns rich text, drawings, stickers, and animations into video frames).
@@ -166,7 +167,7 @@ The user interface follows a single, intuitive layout with contextual specializa
 ### 4.2 Contextual Tool Dock
 The bottom toolbar intelligently adapts to the active page type:
 - **When Image Page is Active**:
-  - **Crop & Adjust**: Opens the image cropping/aspect ratio tool.
+  - **Crop & Adjust**: Opens image cropping/aspect ratio tool.
   - **Filters & Tuning**: Sliders for brightness, contrast, saturation, and aesthetic color presets.
   - **Text, Drawing, Stickers, Shapes**: Unified vector/text tools.
   - **Interactive Overlays**: Polls, quizzes, emoji sliders, question boxes, countdowns, links, mentions.
@@ -184,22 +185,20 @@ The bottom toolbar intelligently adapts to the active page type:
 
 A central challenge in story systems is resolving the dichotomy between **visual pixels** (what must be burned into exported videos/photos for third-party sharing) and **structured data** (what must remain interactive in the FocusGram viewer).
 
-### 5.1 The Dual-Layer Architecture
-
-To solve this, Story Kit establishes a **Dual-Layer Composition Model**:
+### 5.1 The 3-Tier Composition Model
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    StoryCompositionModel                        │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Layer 0: Background Media Layer                           │  │
+│  │ Tier 0: Background Media Layer                            │  │
 │  │ • Image: File URI, Crop Rect, Color Matrix, Blur          │  │
 │  │ • Video: File URI, Trim Range, Speed, Volume, Crop Rect   │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Layer 1: Visual Overlay Elements (Burned into Export)     │  │
+│  │ Tier 1: Visual Overlay Elements (Burned into Export)      │  │
 │  │ • Rich Text (Typography, colors, alignments, gradients)   │  │
 │  │ • Freehand Drawings (Vector strokes, smooth bezier paths) │  │
 │  │ • Stickers & Emojis (PNG/SVG assets, transforms)          │  │
@@ -208,7 +207,7 @@ To solve this, Story Kit establishes a **Dual-Layer Composition Model**:
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Layer 2: Interactive Metadata Overlays (Preserved as Data)│  │
+│  │ Tier 2: Interactive Metadata Overlays (Preserved as Data) │  │
 │  │ • PollOverlay (Question, options, multiple choice flag)   │  │
 │  │ • QuizOverlay (Question, options, correct answer index)   │  │
 │  │ • SliderOverlay (Emoji, question, min/max values)         │  │
@@ -224,9 +223,9 @@ To solve this, Story Kit establishes a **Dual-Layer Composition Model**:
 
 #### Scenario A: In-App FocusGram Story Publishing
 When publishing to FocusGram:
-1. **Background Media**: The background photo or trimmed video is exported with visual adjustments.
-2. **Visual Overlays (Layer 1)**: Text, drawings, and decorative stickers can be rendered into the media or sent alongside.
-3. **Interactive Overlays (Layer 2)**: **NEVER FLATTENED**. They are serialized directly into `StoryItemModel.overlays` using `toJson()`:
+1. **Background Media (Tier 0)**: The background photo or trimmed video is exported with visual adjustments.
+2. **Visual Overlays (Tier 1)**: Text, drawings, and decorative stickers are rendered into the media or sent alongside.
+3. **Interactive Overlays (Tier 2)**: **NEVER FLATTENED**. They are serialized directly into `StoryItemModel.overlays` using `toJson()`:
    ```json
    {
      "id": "poll_123",
@@ -247,8 +246,6 @@ When saving a story to the device gallery or sharing to third-party apps (WhatsA
   - The entire stack (Media + Visual Overlays + Rendered Interactive Cards) is composited into a single standalone MP4 or PNG.
 
 ### 5.3 Video Overlay Compositing Pipeline
-
-Because `easy_video_editor: 0.1.7` does not support overlay compositing, the architecture specifies a dedicated **Timestamp-Synchronized Native Compositor**:
 
 ```
                        ┌────────────────────────────┐
