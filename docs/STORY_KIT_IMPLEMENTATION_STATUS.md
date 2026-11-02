@@ -3,7 +3,7 @@
 **Status:** Living Engineering Status Document  
 **Repository:** `atharvakapse831/focusgram_story_kit`  
 **Primary Branch:** `main`  
-**Current Commit:** `738fff7`  
+**Current Commit:** `e65140a`  
 **Date:** 2026-11-02  
 
 ---
@@ -15,14 +15,14 @@ This document tracks the end-to-end execution of the FocusGram Story Kit and Sto
 | Phase | Description | Status | Verification Summary |
 |---|---|---|---|
 | **Phase 1** | Repository Audit, Baseline Verification & Dependency Assessment | **COMPLETED & REVALIDATED** | Full source audit, verified exact versions of `pro_image_editor` (14.22.0), `easy_video_editor` (0.1.7), and `pro_video_editor` (2.50.1). Architecture and roadmap specifications committed. |
-| **Phase 2** | Core Architecture, Document Models & Contracts | **IMPLEMENTED (In `phase-5/video-and-animation`) / MERGE PENDING TO MAIN** | `StoryProject`, `StoryPage`, `StoryElement`, `StoryTransform`, `StoryEditorConfig`, `StoryCancellationToken`, `StoryExportProgress`, `StoryEditorException`. 100% JSON roundtrip tested. |
-| **Phase 3** | Interactive StoryEditor Canvas MVP | **IMPLEMENTED (In `phase-5/video-and-animation`) / MERGE PENDING TO MAIN** | `StoryKitEditor`, `StoryEditorCanvas`, `EditorController`, direct manipulation gestures, selection bounds, transform handles, undo/redo manager, draft persistence. |
-| **Phase 4** | Complete Image Editing Capabilities | **IMPLEMENTED (In `phase-5/video-and-animation`) / MERGE PENDING TO MAIN** | Freehand drawing (`CanvasDrawingView`), text styling (`CanvasTextView`), stickers (`CanvasStickerView`), vector shapes (`CanvasShapeView`), color adjustments, gradients, templates, still export (`StoryStillImageExporter`). |
-| **Phase 5** | Complete Video Editing, Animation & Native Export | **IMPLEMENTED (In `phase-5/video-and-animation`) / MERGE PENDING TO MAIN** | Video timeline scrubber, trimming (`VideoTrimRange`), clip splitting (`splitVideoClip`), playback speed, native Media3 (Android) and AVFoundation (iOS) video export with animated overlays (`TimestampOverlayRenderer`), cancellation state machine. |
-| **Phase 6** | Mixed-Media Multi-Page Stories & Interactive Overlays | **IMPLEMENTED (In `phase-5/video-and-animation`) / MERGE PENDING TO MAIN** | Multi-page story strip with reordering, `addMediaPage`, `StoryProjectExporter` routing photos to PNG and videos to Media3/AVFoundation MP4. All 7 interactive overlays preserved as structured data. |
-| **Phase 7** | Viewer, Playback & Full Pipeline Validation | **IMPLEMENTED (In `phase-5/video-and-animation`) / MERGE PENDING TO MAIN** | End-to-end testing from canvas import through `StoryKitViewer` playback with live interactive overlay rendering. 137 / 137 tests passing. |
-| **Phase 8** | FocusGram Mobile Host Integration | **COMPLETED IN MOBILE** | Integrated into `Code-Plus-Academy/Mobile` on `feat/story-kit-android-video-integration` with `StoryCreationStudioScreen`. |
-| **Phase 9** | Production Hardening & Acceptance Gates | **IN PROGRESS** | Integrating completed Phase 1–7 tree onto `main`, running full analysis and test suite. |
+| **Phase 2** | Core Architecture, Document Models & Contracts | **COMPLETED & VERIFIED** | `StoryProject`, `StoryPage`, `StoryElement`, `StoryTransform`, `StoryEditorConfig`, `StoryCancellationToken`, `StoryExportProgress`, `StoryEditorException`. 100% JSON roundtrip tested. |
+| **Phase 3** | Interactive StoryEditor Canvas MVP | **COMPLETED & VERIFIED** | `StoryKitEditor`, `StoryEditorCanvas`, `EditorController`, direct manipulation gestures, selection bounds, transform handles, undo/redo manager, draft persistence. |
+| **Phase 4** | Complete Image Editing Capabilities | **COMPLETED & VERIFIED** | Freehand drawing (`CanvasDrawingView`), text styling (`CanvasTextView`), stickers (`CanvasStickerView`), vector shapes (`CanvasShapeView`), color adjustments, gradients, templates, still export (`StoryStillImageExporter`). |
+| **Phase 5** | Complete Video Editing, Animation & Native Export | **COMPLETED & VERIFIED** | Video timeline scrubber, trimming (`VideoTrimRange`), clip splitting (`splitVideoClip`), playback speed, native Media3 (Android) and AVFoundation (iOS) video export with animated overlays (`TimestampOverlayRenderer`), cancellation state machine. |
+| **Phase 6** | Mixed-Media Multi-Page Stories & Interactive Overlays | **COMPLETED & VERIFIED** | Multi-page story strip with reordering, `addMediaPage`, `StoryProjectExporter` routing photos to PNG and videos to Media3/AVFoundation MP4. All 7 interactive overlays preserved as structured data. |
+| **Phase 7** | Viewer, Playback & Full Pipeline Validation | **COMPLETED & VERIFIED** | End-to-end testing from canvas import through `StoryKitViewer` playback with live interactive overlay rendering. 143 / 143 tests passing in Story Kit. |
+| **Phase 8** | FocusGram Mobile Host Integration | **COMPLETED & VERIFIED** | Integrated into `Code-Plus-Academy/Mobile` on `feat/story-kit-android-video-integration` with `StoryCreationStudioScreen` and updated `StoryEditorWrapper`. 27 / 27 story tests passing in Mobile. |
+| **Phase 9** | Production Hardening & Acceptance Gates | **COMPLETED & PRODUCTION-READY** | Resolved Photo Story Creation (P0), genuine clip splitting with timeline synchronization, unified studio editor integration, and expanded CI with Android APK and iOS simulator checks. |
 
 ---
 
@@ -35,16 +35,25 @@ This document tracks the end-to-end execution of the FocusGram Story Kit and Sto
 - Formulated the 3-Way Comparison and established the Hybrid Modular Architecture.
 
 ### Milestones 2–7: Core Engine, Canvas, Image, Video, and Mixed-Media Features
-All production code developed across Phases 1–5 is consolidated on `phase-5/video-and-animation` (HEAD: `dcd0ff8`), comprising:
-- 137 passing tests across model serialization, commands, canvas gestures, drawing, stickers, templates, video trimming, animated overlays, cancellation, and mixed-media export.
-- Clean static analysis (0 analyzer warnings).
+All production code developed across Phases 1–7 is consolidated on `main` (HEAD: `e65140a`), comprising:
+- **143 passing tests** in `focusgram_story_kit` across model serialization, commands, canvas gestures, drawing, stickers, templates, video trimming, clip splitting, animated overlays, cancellation, and still/video export.
+- Clean static analysis (**0 analyzer warnings**).
 - Android Media3 native Kotlin plugin with cancellation state machine.
 - iOS AVFoundation native Swift plugin with concurrent export safety.
+- Expanded multi-platform CI (`.github/workflows/ci.yml`) testing Dart 3.24.x/stable, Android APK build, and iOS simulator build.
 
----
-
-## 3. Immediate Next Tasks
-
-1. Merge/integrate all completed production code from `phase-5/video-and-animation` into `main`.
-2. Run full test suite (`flutter test`) and static analysis (`flutter analyze`) on `main`.
-3. Verify documentation links and generate final release candidate on `main`.
+### Milestone 8–9: FocusGram Mobile Production Integration & Blocker Resolution
+Integrated into FocusGram Mobile (`Code-Plus-Academy/Mobile` on branch `feat/story-kit-android-video-integration`):
+1. **Photo Story Creation (P0):**
+   - Preview renders original selected image (`Image.file`).
+   - Background image adjustments (brightness, contrast, saturation, filters, transforms) rendered on canvas.
+   - Independent still image export via `StoryStillImageExporter`, rendering high-res 1080x1920 PNG.
+   - Images are **never** routed through `StoryVideoExporter`.
+   - Published with `.png` extension, `type: 'image'`, and `StoryItemType.image`.
+2. **Real Video Clip Splitting (P0):**
+   - Preserves contiguous segments `[start, splitTime]` and `[splitTime, end]` without dropping or truncating footage.
+   - Synchronizes `StoryTimelineController` duration and trim range on split, undo, and redo.
+3. **Unified Story Creation Studio:**
+   - `StoryCreationStudioScreen` embeds `StoryKitEditor` supporting multi-page mixed-media stories, templates, vector shapes, layers, and draft persistence.
+   - `StoryEditorWrapper` provides seamless access via "Open Story Creation Studio" option.
+   - **27 / 27 story tests passing** in Mobile.
