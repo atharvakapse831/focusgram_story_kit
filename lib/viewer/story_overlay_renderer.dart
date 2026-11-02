@@ -28,10 +28,7 @@ class StoryOverlayRenderer extends StatelessWidget {
     if (overlays.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = Size(
-          constraints.maxWidth,
-          constraints.maxHeight,
-        );
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
         return Stack(
           clipBehavior: Clip.none,
           children: [
@@ -54,49 +51,46 @@ class StoryOverlayRenderer extends StatelessWidget {
     return switch (overlay) {
       PollOverlay poll => _PollWidget(
         poll: poll,
-        onVote: (index) => _interact(poll.id, {
-          'type': 'poll',
-          'optionIndex': index,
-        }),
+        onVote:
+            (index) =>
+                _interact(poll.id, {'type': 'poll', 'optionIndex': index}),
       ),
       QuizOverlay quiz => _QuizWidget(
         quiz: quiz,
-        onAnswer: (index) => _interact(quiz.id, {
-          'type': 'quiz',
-          'optionIndex': index,
-          'correct': index == quiz.answerIndex,
-        }),
+        onAnswer:
+            (index) => _interact(quiz.id, {
+              'type': 'quiz',
+              'optionIndex': index,
+              'correct': index == quiz.answerIndex,
+            }),
       ),
       SliderOverlay slider => _SliderWidget(
         slider: slider,
-        onSlide: (value) => _interact(slider.id, {
-          'type': 'slider',
-          'value': value,
-        }),
+        onSlide:
+            (value) => _interact(slider.id, {'type': 'slider', 'value': value}),
       ),
       QuestionOverlay question => _QuestionWidget(
         question: question,
-        onSubmit: (text) => _interact(question.id, {
-          'type': 'question',
-          'text': text,
-        }),
+        onSubmit:
+            (text) =>
+                _interact(question.id, {'type': 'question', 'text': text}),
       ),
       CountdownOverlay countdown => _CountdownWidget(countdown: countdown),
       LinkOverlay link => _LinkWidget(
         link: link,
-        onTap: () => _interact(link.id, {
-          'type': 'link',
-          'url': link.url,
-        }),
+        onTap: () => _interact(link.id, {'type': 'link', 'url': link.url}),
       ),
       MentionOverlay mention => _MentionWidget(
         mention: mention,
-        onTap: () => _interact(mention.id, {
-          'type': 'mention',
-          'userId': mention.userId,
-          'username': mention.username,
-        }),
+        onTap:
+            () => _interact(mention.id, {
+              'type': 'mention',
+              'userId': mention.userId,
+              'username': mention.username,
+            }),
       ),
+      UnknownStoryOverlay _ => const SizedBox.shrink(),
+      _ => const SizedBox.shrink(),
     };
   }
 
@@ -146,6 +140,7 @@ class _PollWidgetState extends State<_PollWidget> {
                 label: poll.options[i],
                 selected: _votedIndex == i,
                 onTap: () {
+                  if (_votedIndex != null) return;
                   setState(() => _votedIndex = i);
                   widget.onVote(i);
                 },
@@ -229,12 +224,13 @@ class _QuizWidgetState extends State<_QuizWidget> {
               child: _QuizOptionRow(
                 label: quiz.options[i],
                 state: _stateFor(i),
-                onTap: _answeredIndex == null
-                    ? () {
-                        setState(() => _answeredIndex = i);
-                        widget.onAnswer(i);
-                      }
-                    : null,
+                onTap:
+                    _answeredIndex == null
+                        ? () {
+                          setState(() => _answeredIndex = i);
+                          widget.onAnswer(i);
+                        }
+                        : null,
               ),
             ),
         ],
@@ -296,10 +292,7 @@ class _QuizOptionRow extends StatelessWidget {
             ],
             Text(
               label,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -323,8 +316,28 @@ class _SliderWidget extends StatefulWidget {
 }
 
 class _SliderWidgetState extends State<_SliderWidget> {
-  double _value = 0;
+  // Attached to the slider track so drag positions map to the track's own
+  // bounds, not the whole overlay card (which includes the question text).
+  final GlobalKey _sliderTrackKey = GlobalKey();
+  late double _value;
   bool _dragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.slider.minValue;
+  }
+
+  @override
+  void didUpdateWidget(covariant _SliderWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.slider.id != widget.slider.id ||
+        oldWidget.slider.minValue != widget.slider.minValue ||
+        oldWidget.slider.maxValue != widget.slider.maxValue) {
+      _value = widget.slider.minValue;
+      _dragging = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -346,14 +359,19 @@ class _SliderWidgetState extends State<_SliderWidget> {
             ),
           GestureDetector(
             onHorizontalDragUpdate: (details) {
-              final box = context.findRenderObject() as RenderBox?;
+              final box =
+                  _sliderTrackKey.currentContext?.findRenderObject()
+                      as RenderBox?;
               if (box == null || box.size.width <= 0) return;
-              final localX = details.localPosition.dx.clamp(
-                0.0,
-                box.size.width,
-              );
+              final localX =
+                  box
+                      .globalToLocal(details.globalPosition)
+                      .dx
+                      .clamp(0.0, box.size.width)
+                      .toDouble();
               final fraction = localX / box.size.width;
-              final value = slider.minValue +
+              final value =
+                  slider.minValue +
                   fraction * (slider.maxValue - slider.minValue);
               setState(() {
                 _value = value;
@@ -365,6 +383,7 @@ class _SliderWidgetState extends State<_SliderWidget> {
               widget.onSlide(_value);
             },
             child: Container(
+              key: _sliderTrackKey,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.white24,
@@ -373,7 +392,10 @@ class _SliderWidgetState extends State<_SliderWidget> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(slider.emoji, style: TextStyle(fontSize: 24 + (_dragging ? 8 : 0))),
+                  Text(
+                    slider.emoji,
+                    style: TextStyle(fontSize: 24 + (_dragging ? 8 : 0)),
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     _value.toStringAsFixed(0),
@@ -491,11 +513,12 @@ class _CountdownWidget extends StatefulWidget {
 
 class _CountdownWidgetState extends State<_CountdownWidget> {
   late Timer _timer;
-  Duration _remaining = widget.countdown.targetTime.difference(DateTime.now());
+  late Duration _remaining;
 
   @override
   void initState() {
     super.initState();
+    _remaining = widget.countdown.targetTime.difference(DateTime.now());
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() {
@@ -513,11 +536,12 @@ class _CountdownWidgetState extends State<_CountdownWidget> {
   @override
   Widget build(BuildContext context) {
     final expired = _remaining.isNegative;
-    final text = expired
-        ? 'Done'
-        : '${_remaining.inHours.toString().padLeft(2, '0')}:'
-            '${(_remaining.inMinutes % 60).toString().padLeft(2, '0')}:'
-            '${(_remaining.inSeconds % 60).toString().padLeft(2, '0')}';
+    final text =
+        expired
+            ? 'Done'
+            : '${_remaining.inHours.toString().padLeft(2, '0')}:'
+                '${(_remaining.inMinutes % 60).toString().padLeft(2, '0')}:'
+                '${(_remaining.inSeconds % 60).toString().padLeft(2, '0')}';
     return _OverlayCard(
       child: Row(
         mainAxisSize: MainAxisSize.min,

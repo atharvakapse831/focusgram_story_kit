@@ -2,10 +2,8 @@
 ///
 /// Lives in this base file so the viewer and renderer share one canonical
 /// typedef without circular imports or duplicate exports.
-typedef OnOverlayInteraction = void Function(
-  String overlayId,
-  Map<String, dynamic> payload,
-);
+typedef OnOverlayInteraction =
+    void Function(String overlayId, Map<String, dynamic> payload);
 
 /// Base for every interactive overlay placed on a story item.
 ///
@@ -211,4 +209,28 @@ class MentionOverlay extends StoryOverlay {
     'userId': userId,
     'username': username,
   };
+}
+
+/// Placeholder for overlay payloads this app version does not understand.
+///
+/// Forward compatibility: the codec wraps unrecognized types so a
+/// decode/re-encode round-trip never drops content written by newer app
+/// versions. The renderer skips it instead of crashing.
+class UnknownStoryOverlay extends StoryOverlay {
+  /// The unrecognized `type` value from the source payload.
+  final String type;
+
+  /// The original payload, preserved so re-encoding is lossless.
+  final Map<String, dynamic> rawData;
+
+  const UnknownStoryOverlay({
+    required super.id,
+    required super.normalizedDx,
+    required super.normalizedDy,
+    required this.type,
+    required this.rawData,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => Map<String, dynamic>.from(rawData);
 }

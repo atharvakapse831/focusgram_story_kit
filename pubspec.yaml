@@ -12,13 +12,15 @@ topics:
   - flutter
 
 environment:
-  sdk: ^3.5.0
-  flutter: ">=3.24.0"
+  # Wildcard `_` parameters (used in _buildMedia image builders) require
+  # Dart 3.7+; do not lower this constraint without removing that syntax.
+  sdk: ^3.7.0
+  flutter: ">=3.29.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  cached_network_image: ^3.4.1
+  cached_network_image: ">=3.4.1 <5.0.0"
   video_player: ^2.9.2
 
 # story_editor_pro (capture/editing UI) stays a direct dependency of the host
@@ -30,4 +32,10 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 flutter:
-  # No native plugin platforms in this package — pure Dart/UI + widget tests.
+  plugin:
+    platforms:
+      android:
+        package: com.focusgram.storykit
+        pluginClass: FocusgramStoryKitPlugin
+      ios:
+        pluginClass: FocusgramStoryKitPlugin
