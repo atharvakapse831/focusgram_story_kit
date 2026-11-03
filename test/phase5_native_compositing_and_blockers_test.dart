@@ -380,6 +380,47 @@ void main() {
     );
 
     test(
+      'Repeated cancellation calls on active export job are idempotent and deliver single terminal result',
+      () async {
+        var cancelCallCount = 0;
+        final exporter = StoryVideoExporter(
+          systemTempDirectory: tempDir,
+          adapter: _TestCancelTrackingAdapter(
+            onCancelCalled: () => cancelCallCount++,
+          ),
+        );
+
+        const page = StoryPage(
+          id: 'page_cancel_repeat',
+          duration: Duration(seconds: 4),
+          elements: [],
+        );
+        const project = StoryProject(id: 'proj_cancel_repeat', pages: [page]);
+        final job = exporter.startExport(project: project);
+
+        // Call cancel multiple times in rapid succession
+        await Future.wait([
+          job.cancel(),
+          job.cancel(),
+          job.cancel(),
+        ]);
+
+        expect(job.isCancelled, isTrue);
+        expect(cancelCallCount, equals(1)); // onCancel handler invoked exactly once
+        expect(
+          () => job.result,
+          throwsA(
+            isA<VideoExportException>().having(
+              (e) => e.code,
+              'code',
+              ExportErrorCode.cancelled,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'All element types render on transparent overlay canvas without exception',
       () async {
         const textEl = StoryElement(
@@ -459,4 +500,16 @@ void main() {
       },
     );
   });
+}
+
+class _TestCancelTrackingAdapter extends SoftwareStoryVideoExportAdapter {
+  _TestCancelTrackingAdapter({required this.onCancelCalled})
+    : super(simulatedDurationMs: 1000);
+
+  final VoidCallback onCancelCalled;
+
+  @override
+  Future<void> cancelJob(String jobId) async {
+    onCancelCalled();
+  }
 }

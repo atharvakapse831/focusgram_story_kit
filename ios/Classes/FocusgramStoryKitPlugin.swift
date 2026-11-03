@@ -17,6 +17,7 @@ private class ActiveExportSession {
     private let lock = NSLock()
 
     var isCancelled: Bool = false
+    var cancelCallback: FlutterResult?
 
     init(jobId: String, session: AVAssetExportSession, outputURL: URL, resultCallback: @escaping FlutterResult) {
         self.jobId = jobId
@@ -30,8 +31,10 @@ private class ActiveExportSession {
         defer { lock.unlock() }
         guard !hasReplied else { return }
         hasReplied = true
+        let cancelCb = self.cancelCallback
         DispatchQueue.main.async {
             self.resultCallback(result)
+            cancelCb?(nil)
         }
     }
 }
@@ -73,6 +76,17 @@ public class FocusgramStoryKitPlugin: NSObject, FlutterPlugin {
               let workingDirectory = args["workingDirectory"] as? String,
               let projectMap = args["project"] as? [String: Any] else {
             result(FlutterError(code: "INVALID_ARGS", message: "Missing required export parameters", details: nil))
+            return
+        }
+
+        var isAlreadyRunning = false
+        sessionsQueue.sync {
+            if self.activeSessions[jobId] != nil {
+                isAlreadyRunning = true
+            }
+        }
+        if isAlreadyRunning {
+            result(FlutterError(code: "CONFLICT", message: "An export job with id '\(jobId)' is already running", details: nil))
             return
         }
 
@@ -343,17 +357,38 @@ public class FocusgramStoryKitPlugin: NSObject, FlutterPlugin {
             return
         }
 
+        var targetSession: ActiveExportSession?
         sessionsQueue.sync {
-            if let active = self.activeSessions.removeValue(forKey: jobId) {
+            if let active = self.activeSessions[jobId] {
                 active.isCancelled = true
-                active.session.cancelExport()
-                if FileManager.default.fileExists(atPath: active.outputURL.path) {
-                    try? FileManager.default.removeItem(at: active.outputURL)
-                }
-                active.complete(result: FlutterError(code: "CANCELLED", message: "Export cancelled by user", details: nil))
+                active.cancelCallback = result
+                targetSession = active
             }
         }
-        result(nil)
+
+        guard let active = targetSession else {
+            result(nil)
+            return
+        }
+
+        // Trigger native AVAssetExportSession cancellation.
+        // The termination handler inside exportAsynchronously executes after AVFoundation terminates,
+        // safely deleting the output file without file lock races, and delivering terminal callbacks.
+        active.session.cancelExport()
+
+        // Bounded watchdog timer: if AVAssetExportSession does not trigger its completion within 5 seconds,
+        // force termination and clean up deterministically.
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            guard let self = self else { return }
+            self.sessionsQueue.sync {
+                if let stillActive = self.activeSessions.removeValue(forKey: jobId) {
+                    if FileManager.default.fileExists(atPath: stillActive.outputURL.path) {
+                        try? FileManager.default.removeItem(at: stillActive.outputURL)
+                    }
+                    stillActive.complete(result: FlutterError(code: "CANCELLED", message: "Export cancelled by user (timed termination)", details: nil))
+                }
+            }
+        }
     }
 }
 

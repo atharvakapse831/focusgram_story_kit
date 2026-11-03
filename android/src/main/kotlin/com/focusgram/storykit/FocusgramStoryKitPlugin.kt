@@ -192,6 +192,11 @@ class FocusgramStoryKitPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
 
+        if (activeJobs.containsKey(jobId)) {
+            result.error("CONFLICT", "An export job with id '$jobId' is already running", null)
+            return
+        }
+
         val workingDirectory = call.argument<String>("workingDirectory") ?: run {
             result.error("INVALID_ARGS", "Missing workingDirectory", null)
             return
