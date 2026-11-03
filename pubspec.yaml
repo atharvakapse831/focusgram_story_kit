@@ -32,4 +32,10 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 flutter:
-  # No package assets are bundled. video_player uses native plugin implementations
+  plugin:
+    platforms:
+      android:
+        package: com.focusgram.storykit
+        pluginClass: FocusgramStoryKitPlugin
+      ios:
+        pluginClass: FocusgramStoryKitPlugin

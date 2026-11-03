@@ -4,10 +4,13 @@ import 'image_adjustments.dart';
 import 'shape_payload.dart';
 import 'story_media_asset.dart';
 import 'story_shared_content.dart';
+import 'video_payload.dart';
 
 export 'drawing_stroke.dart';
 export 'image_adjustments.dart';
+export 'overlay_animation.dart';
 export 'shape_payload.dart';
+export 'video_payload.dart';
 
 /// Base contract for payload data attached to a [StoryElement].
 @immutable
@@ -38,6 +41,8 @@ abstract class StoryElementPayload {
         return DrawingElementPayload.fromJson(json);
       case 'shape':
         return ShapeElementPayload.fromJson(json);
+      case 'video':
+        return VideoElementPayload.fromJson(json);
       default:
         return UnknownElementPayload(rawType: discriminator, rawData: json);
     }
@@ -463,4 +468,46 @@ class UnknownElementPayload extends StoryElementPayload {
 
   @override
   int get hashCode => rawType.hashCode;
+}
+
+/// Payload for in-canvas floating video story elements.
+@immutable
+class VideoElementPayload extends StoryElementPayload {
+  const VideoElementPayload({required this.video});
+
+  final StoryVideoPayload video;
+
+  /// Convenience accessors delegating to [video].
+  StoryMediaAsset get asset => video.asset;
+  VideoTrimRange get trimRange => video.trimRange;
+  VideoAudioPolicy get audioPolicy => video.audioPolicy;
+  VideoFitMode get fitMode => video.fitMode;
+
+  @override
+  String get typeDiscriminator => 'video';
+
+  VideoElementPayload copyWith({StoryVideoPayload? video}) {
+    return VideoElementPayload(video: video ?? this.video);
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {'video': video.toJson()};
+
+  factory VideoElementPayload.fromJson(Map<String, dynamic> json) {
+    return VideoElementPayload(
+      video: StoryVideoPayload.fromJson(
+        Map<String, dynamic>.from(json['video'] as Map? ?? {}),
+      ),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VideoElementPayload &&
+          runtimeType == other.runtimeType &&
+          video == other.video;
+
+  @override
+  int get hashCode => video.hashCode;
 }

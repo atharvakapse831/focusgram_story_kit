@@ -10,6 +10,7 @@ enum StoryElementType {
   card,
   drawing,
   shape,
+  video,
   unknown;
 
   static StoryElementType fromString(String? raw) {
@@ -27,6 +28,8 @@ enum StoryElementType {
         return StoryElementType.drawing;
       case 'shape':
         return StoryElementType.shape;
+      case 'video':
+        return StoryElementType.video;
       default:
         return StoryElementType.unknown;
     }
@@ -45,6 +48,8 @@ class StoryElement {
     this.zIndex = 0,
     this.isVisible = true,
     this.isLocked = false,
+    this.visibleTimeRange,
+    this.animation,
   }) : assert(
          opacity >= 0.0 && opacity <= 1.0,
          'opacity must be in [0.0, 1.0]',
@@ -71,6 +76,12 @@ class StoryElement {
   /// When true, prevents selection and interactive transformation.
   final bool isLocked;
 
+  /// Optional time interval during which this element is visible.
+  final LayerTimeRange? visibleTimeRange;
+
+  /// Optional motion entrance/exit animation configuration.
+  final OverlayAnimationConfig? animation;
+
   /// Typed element content (text styling, image asset, sticker, shared card, etc.).
   final StoryElementPayload payload;
 
@@ -83,6 +94,10 @@ class StoryElement {
     int? zIndex,
     bool? isVisible,
     bool? isLocked,
+    LayerTimeRange? visibleTimeRange,
+    bool clearVisibleTimeRange = false,
+    OverlayAnimationConfig? animation,
+    bool clearAnimation = false,
   }) {
     return StoryElement(
       id: id ?? this.id,
@@ -93,6 +108,11 @@ class StoryElement {
       zIndex: zIndex ?? this.zIndex,
       isVisible: isVisible ?? this.isVisible,
       isLocked: isLocked ?? this.isLocked,
+      visibleTimeRange:
+          clearVisibleTimeRange
+              ? null
+              : (visibleTimeRange ?? this.visibleTimeRange),
+      animation: clearAnimation ? null : (animation ?? this.animation),
     );
   }
 
@@ -104,6 +124,9 @@ class StoryElement {
     'zIndex': zIndex,
     'isVisible': isVisible,
     'isLocked': isLocked,
+    if (visibleTimeRange != null)
+      'visibleTimeRange': visibleTimeRange!.toJson(),
+    if (animation != null) 'animation': animation!.toJson(),
     'payload': payload.toJson(),
   };
 
@@ -125,6 +148,18 @@ class StoryElement {
       zIndex: json['zIndex'] as int? ?? 0,
       isVisible: json['isVisible'] as bool? ?? true,
       isLocked: json['isLocked'] as bool? ?? false,
+      visibleTimeRange:
+          json['visibleTimeRange'] != null
+              ? LayerTimeRange.fromJson(
+                Map<String, dynamic>.from(json['visibleTimeRange'] as Map),
+              )
+              : null,
+      animation:
+          json['animation'] != null
+              ? OverlayAnimationConfig.fromJson(
+                Map<String, dynamic>.from(json['animation'] as Map),
+              )
+              : null,
     );
   }
 
@@ -140,6 +175,8 @@ class StoryElement {
           zIndex == other.zIndex &&
           isVisible == other.isVisible &&
           isLocked == other.isLocked &&
+          visibleTimeRange == other.visibleTimeRange &&
+          animation == other.animation &&
           payload == other.payload;
 
   @override
@@ -151,6 +188,8 @@ class StoryElement {
     zIndex,
     isVisible,
     isLocked,
+    visibleTimeRange,
+    animation,
     payload,
   );
 }

@@ -7,6 +7,7 @@ import '../models/story_page.dart';
 import '../models/story_project.dart';
 import '../models/story_template.dart';
 import '../models/story_transform.dart';
+import '../timeline/timeline_controller.dart';
 import 'command_history.dart';
 import 'editor_commands.dart';
 import 'editor_state.dart';
@@ -16,8 +17,12 @@ import 'editor_state.dart';
 /// Implements [ChangeNotifier] to drive reactive UI updates while isolating
 /// document state ([StoryProject]) from ephemeral interaction state ([EditorState]).
 class EditorController extends ChangeNotifier {
-  EditorController({StoryProject? initialProject, CommandHistory? history})
-    : _history = history ?? CommandHistory() {
+  EditorController({
+    StoryProject? initialProject,
+    CommandHistory? history,
+    StoryTimelineController? timelineController,
+  }) : _history = history ?? CommandHistory(),
+       _timelineController = timelineController {
     if (initialProject != null && initialProject.pages.isNotEmpty) {
       _project = initialProject;
       _state = EditorState(activePageId: initialProject.pages.first.id);
@@ -35,6 +40,19 @@ class EditorController extends ChangeNotifier {
   late EditorState _state;
   final CommandHistory _history;
   late int _lastSavedRevision;
+  StoryTimelineController? _timelineController;
+
+  /// Single source of truth timeline controller for video playback and animated layers.
+  StoryTimelineController get timelineController {
+    if (_timelineController == null) {
+      final page = activePage;
+      _timelineController = StoryTimelineController(
+        initialDuration: page.duration,
+        initialTrimRange: page.videoTrimRange,
+      );
+    }
+    return _timelineController!;
+  }
 
   /// Current serializable story document.
   StoryProject get project => _project;
@@ -75,7 +93,20 @@ class EditorController extends ChangeNotifier {
   /// Switches the active slide to [pageId].
   void selectPage(String pageId) {
     if (_state.activePageId == pageId) return;
-    _state = _state.copyWith(activePageId: pageId, clearSelectedElement: true);
+    final targetPage = _project.getPage(pageId);
+    final isVideo = targetPage?.backgroundAsset?.isVideo == true;
+    _state = _state.copyWith(
+      activePageId: pageId,
+      clearSelectedElement: true,
+      showTimeline: isVideo ? true : _state.showTimeline,
+    );
+    if (targetPage != null && _timelineController != null) {
+      _timelineController!.setTotalDuration(targetPage.duration);
+      _timelineController!.setTrimRange(targetPage.videoTrimRange);
+      _timelineController!.seekTo(
+        targetPage.videoTrimRange?.start ?? Duration.zero,
+      );
+    }
     notifyListeners();
   }
 
@@ -107,6 +138,14 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Toggles visibility of the video timeline scrubber.
+  void toggleTimeline([bool? show]) {
+    final next = show ?? !_state.showTimeline;
+    if (_state.showTimeline == next) return;
+    _state = _state.copyWith(showTimeline: next);
+    notifyListeners();
+  }
+
   /// Sets whether the user is actively dragging/scaling/rotating an element.
   void setInteracting(bool isInteracting) {
     if (_state.isInteracting == isInteracting) return;
@@ -130,6 +169,7 @@ class EditorController extends ChangeNotifier {
     _project = _history.undo(_project);
     // Ensure active page ID and selection remain valid
     _sanitizeSelection();
+    _syncTimelineWithActivePage();
     notifyListeners();
   }
 
@@ -138,6 +178,7 @@ class EditorController extends ChangeNotifier {
     if (!_history.canRedo) return;
     _project = _history.redo(_project);
     _sanitizeSelection();
+    _syncTimelineWithActivePage();
     notifyListeners();
   }
 
@@ -288,6 +329,28 @@ class EditorController extends ChangeNotifier {
     selectPage(_project.pages[newIndex].id);
   }
 
+  /// Reorders a page from [oldIndex] to [newIndex].
+  void reorderPage(int oldIndex, int newIndex) {
+    execute(ReorderPageCommand(oldIndex: oldIndex, newIndex: newIndex));
+  }
+
+  /// Appends a new page with a background media asset (photo or video).
+  void addMediaPage(
+    StoryMediaAsset asset, {
+    Duration duration = const Duration(seconds: 5),
+  }) {
+    final isVideo = asset.isVideo;
+    final newPage = StoryPage(
+      id:
+          'page_${DateTime.now().millisecondsSinceEpoch}_${_project.pages.length + 1}',
+      duration: isVideo ? duration : const Duration(seconds: 5),
+      backgroundAsset: asset,
+      videoTrimRange: isVideo ? VideoTrimRange(end: duration) : null,
+    );
+    execute(AddPageCommand(page: newPage));
+    selectPage(newPage.id);
+  }
+
   /// Sets the background color or media asset for the active page.
   void setPageBackground({
     Color? color,
@@ -354,11 +417,27 @@ class EditorController extends ChangeNotifier {
     );
   }
 
+  /// Updates background image adjustments for the active page.
+  void updatePageImageAdjustments(ImageAdjustments? newAdjustments) {
+    final current = activePage;
+    execute(
+      UpdatePageImageAdjustmentsCommand(
+        pageId: current.id,
+        previousAdjustments: current.imageAdjustments,
+        newAdjustments: newAdjustments,
+      ),
+    );
+  }
+
   /// Updates image adjustments (brightness, contrast, saturation, filters).
   void updateImageAdjustments(
-    String elementId,
+    String? elementId,
     ImageAdjustments newAdjustments,
   ) {
+    if (elementId == null || elementId == 'background') {
+      updatePageImageAdjustments(newAdjustments);
+      return;
+    }
     final el = activePage.getElement(elementId);
     if (el == null || el.payload is! ImageElementPayload) return;
     final payload = el.payload as ImageElementPayload;
@@ -408,8 +487,114 @@ class EditorController extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
+  // Phase 5 Video, Timeline & Animation Actions
+  // ---------------------------------------------------------------------------
+
+  /// Updates the trim boundaries for the active page's background video.
+  void setVideoTrimRange(VideoTrimRange? range) {
+    final page = activePage;
+    execute(
+      SetPageVideoTrimRangeCommand(
+        pageId: page.id,
+        newTrimRange: range,
+        previousTrimRange: page.videoTrimRange,
+      ),
+    );
+    _timelineController?.setTrimRange(range);
+  }
+
+  /// Updates the audio mixing/muting policy for the active page.
+  void setAudioPolicy(VideoAudioPolicy? policy) {
+    final page = activePage;
+    execute(
+      SetPageAudioPolicyCommand(
+        pageId: page.id,
+        newAudioPolicy: policy,
+        previousAudioPolicy: page.audioPolicy,
+      ),
+    );
+  }
+
+  /// Updates the cover frame timestamp for the active page.
+  void setCoverTimestamp(Duration? timestamp) {
+    final page = activePage;
+    execute(
+      SetPageCoverTimestampCommand(
+        pageId: page.id,
+        newCoverTimestamp: timestamp,
+        previousCoverTimestamp: page.coverTimestamp,
+      ),
+    );
+  }
+
+  /// Sets the time-bounded visibility range for a specific layer.
+  void setElementTimeRange(String elementId, LayerTimeRange? range) {
+    final page = activePage;
+    final el = page.getElement(elementId);
+    if (el == null) return;
+
+    execute(
+      SetElementTimeRangeCommand(
+        pageId: page.id,
+        elementId: elementId,
+        newTimeRange: range,
+        previousTimeRange: el.visibleTimeRange,
+      ),
+    );
+  }
+
+  /// Sets the entrance/exit animation configuration for a specific layer.
+  void setElementAnimation(
+    String elementId,
+    OverlayAnimationConfig? animation,
+  ) {
+    final page = activePage;
+    final el = page.getElement(elementId);
+    if (el == null) return;
+
+    execute(
+      SetElementAnimationCommand(
+        pageId: page.id,
+        elementId: elementId,
+        newAnimation: animation,
+        previousAnimation: el.animation,
+      ),
+    );
+  }
+
+  /// Splits the active video page into two contiguous pages at [splitTime].
+  void splitVideoClip(Duration splitTime) {
+    final page = activePage;
+    final newPageId = 'page_${DateTime.now().millisecondsSinceEpoch}_split';
+    execute(
+      SplitPageVideoClipCommand(
+        pageId: page.id,
+        newPageId: newPageId,
+        splitTime: splitTime,
+        previousPage: page,
+      ),
+    );
+    _syncTimelineWithActivePage();
+  }
+
+  @override
+  void dispose() {
+    _timelineController?.dispose();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
   // Internal Helpers
   // ---------------------------------------------------------------------------
+
+  void _syncTimelineWithActivePage() {
+    if (_timelineController != null) {
+      final page = activePage;
+      _timelineController!.setTotalDuration(page.duration);
+      _timelineController!.setTrimRange(page.videoTrimRange);
+      _timelineController!.seekTo(page.videoTrimRange?.start ?? Duration.zero);
+    }
+  }
 
   void _sanitizeSelection() {
     if (_project.getPage(_state.activePageId) == null) {

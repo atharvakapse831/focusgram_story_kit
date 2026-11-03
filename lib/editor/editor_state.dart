@@ -12,6 +12,10 @@ enum EditorTool {
   adjust,
   layers,
   template,
+  timeline,
+  animation,
+  audio,
+  cover,
 }
 
 /// Immutable snapshot of the transient user interaction state in the editor.
@@ -23,6 +27,7 @@ class EditorState {
     this.activeTool = EditorTool.select,
     this.isInteracting = false,
     this.showPageStrip = true,
+    this.showTimeline = false,
     this.snapX,
     this.snapY,
     this.activeBrushType = DrawingBrushType.pen,
@@ -44,6 +49,9 @@ class EditorState {
 
   /// Whether the page strip thumbnail bar at the bottom is visible.
   final bool showPageStrip;
+
+  /// Whether the video timeline scrubber panel at the bottom is visible.
+  final bool showTimeline;
 
   /// Active horizontal snap guideline normalized in `[0.0, 1.0]` (e.g. 0.5 for center), if snapping.
   final double? snapX;
@@ -69,6 +77,7 @@ class EditorState {
     EditorTool? activeTool,
     bool? isInteracting,
     bool? showPageStrip,
+    bool? showTimeline,
     double? snapX,
     bool clearSnapX = false,
     double? snapY,
@@ -86,6 +95,7 @@ class EditorState {
       activeTool: activeTool ?? this.activeTool,
       isInteracting: isInteracting ?? this.isInteracting,
       showPageStrip: showPageStrip ?? this.showPageStrip,
+      showTimeline: showTimeline ?? this.showTimeline,
       snapX: clearSnapX ? null : (snapX ?? this.snapX),
       snapY: clearSnapY ? null : (snapY ?? this.snapY),
       activeBrushType: activeBrushType ?? this.activeBrushType,
@@ -104,6 +114,7 @@ class EditorState {
           activeTool == other.activeTool &&
           isInteracting == other.isInteracting &&
           showPageStrip == other.showPageStrip &&
+          showTimeline == other.showTimeline &&
           snapX == other.snapX &&
           snapY == other.snapY &&
           activeBrushType == other.activeBrushType &&
@@ -117,6 +128,7 @@ class EditorState {
     activeTool,
     isInteracting,
     showPageStrip,
+    showTimeline,
     snapX,
     snapY,
     activeBrushType,

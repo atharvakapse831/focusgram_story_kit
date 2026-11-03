@@ -37,6 +37,16 @@ class StoryMediaAsset {
   /// Asset playback duration if time-based.
   final Duration? duration;
 
+  /// Whether this media asset represents a video file or stream.
+  bool get isVideo =>
+      mimeType?.startsWith('video/') == true ||
+      uri.endsWith('.mp4') ||
+      uri.endsWith('.mov') ||
+      uri.endsWith('.m4v');
+
+  /// Resolves the file or network path of this asset.
+  String get resolvedPath => uri;
+
   StoryMediaAsset copyWith({
     String? id,
     StoryMediaSourceType? sourceType,

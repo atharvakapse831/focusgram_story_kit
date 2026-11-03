@@ -4,16 +4,21 @@ import '../draft/draft_repository.dart';
 import '../draft/in_memory_draft_repository.dart';
 import '../export/export_result.dart';
 import '../export/still_image_exporter.dart';
+import '../export/story_project_exporter.dart';
 import '../localization/story_kit_strings.dart';
 import '../media/capture_adapter.dart';
 import '../media/media_picker_adapter.dart';
 import '../models/gradient_background.dart';
 import '../models/story_element.dart';
+import '../models/story_media_asset.dart';
 import '../models/story_project.dart';
 import '../theme/story_kit_theme.dart';
 import 'canvas/story_editor_canvas.dart';
 import 'canvas/story_page_strip.dart';
 import 'editor_controller.dart';
+import 'panels/animation_picker_sheet.dart';
+import 'panels/audio_settings_sheet.dart';
+import 'panels/cover_picker_sheet.dart';
 import 'panels/drawing_toolbar.dart';
 import 'panels/image_adjustment_sheet.dart';
 import 'panels/layer_manager_sheet.dart';
@@ -21,6 +26,7 @@ import 'panels/rich_text_editor_sheet.dart';
 import 'panels/shape_picker_sheet.dart';
 import 'panels/sticker_picker_sheet.dart';
 import 'panels/template_picker_sheet.dart';
+import 'panels/timeline_scrubber.dart';
 
 /// Configuration options for the [StoryKitEditor] UI.
 @immutable
@@ -36,6 +42,9 @@ class StoryKitEditorConfig {
     this.enableAdjustments = true,
     this.enableStickers = true,
     this.enableGradients = true,
+    this.enableTimeline = true,
+    this.enableAnimation = true,
+    this.enableAudioSettings = true,
     this.theme = StoryKitEditorTheme.dark,
     this.strings = const StoryKitStrings(),
     this.assetProvider = const DefaultStoryAssetProvider(),
@@ -62,6 +71,9 @@ class StoryKitEditorConfig {
   final bool enableAdjustments;
   final bool enableStickers;
   final bool enableGradients;
+  final bool enableTimeline;
+  final bool enableAnimation;
+  final bool enableAudioSettings;
   final StoryKitEditorTheme theme;
   final StoryKitStrings strings;
   final StoryAssetProvider assetProvider;
@@ -84,6 +96,7 @@ class StoryKitEditor extends StatefulWidget {
     this.config = const StoryKitEditorConfig(),
     this.onClose,
     this.onExport,
+    this.onExportProject,
     this.onSaveDraft,
   });
 
@@ -102,8 +115,11 @@ class StoryKitEditor extends StatefulWidget {
   /// Fired when the user dismisses the editor.
   final VoidCallback? onClose;
 
-  /// Fired when the user successfully renders and exports the story slides.
+  /// Fired when the user successfully renders and exports the story slides as still images.
   final ValueChanged<List<StillImageExportResult>>? onExport;
+
+  /// Fired when all pages of the story project (photo, video, or mixed) are exported.
+  final ValueChanged<StoryProjectExportResult>? onExportProject;
 
   /// Fired when the user saves the draft.
   final ValueChanged<StoryProject>? onSaveDraft;
@@ -117,6 +133,7 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
   late final bool _ownsController;
   late final StoryDraftRepository _draftRepo;
   bool _isExporting = false;
+  String _exportProgressMsg = '';
 
   @override
   void initState() {
@@ -148,6 +165,10 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
     }
     for (final el in _controller.activePage.elements) {
       if (el.type == StoryElementType.image) return el.id;
+    }
+    if (_controller.activePage.backgroundAsset != null &&
+        !_controller.activePage.backgroundAsset!.isVideo) {
+      return 'background';
     }
     return null;
   }
@@ -184,6 +205,21 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
                     else
                       _buildTopBar(context),
                     Expanded(child: StoryEditorCanvas(controller: _controller)),
+                    if (widget.config.enableTimeline &&
+                        _controller.state.showTimeline &&
+                        !isDrawing)
+                      TimelineScrubber(
+                        controller: _controller,
+                        onOpenAnimationSheet:
+                            widget.config.enableAnimation
+                                ? () => _openAnimationSheet(context)
+                                : null,
+                        onOpenAudioSheet:
+                            widget.config.enableAudioSettings
+                                ? () => _openAudioSheet(context)
+                                : null,
+                        onOpenCoverSheet: () => _openCoverSheet(context),
+                      ),
                     if (widget.config.enablePageStrip &&
                         _controller.state.showPageStrip &&
                         !isDrawing)
@@ -202,7 +238,9 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
                         const CircularProgressIndicator(color: Colors.white),
                         const SizedBox(height: 16),
                         Text(
-                          strings.exportingStory,
+                          _exportProgressMsg.isNotEmpty
+                              ? _exportProgressMsg
+                              : strings.exportingStory,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -274,6 +312,18 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
                     tooltip: strings.addText,
                     onPressed: () => _openTextEditor(context),
                   ),
+
+                  // Add Media (Photo / Video)
+                  if (widget.config.mediaPickerAdapter != null ||
+                      widget.config.captureAdapter != null)
+                    IconButton(
+                      icon: Icon(
+                        Icons.add_photo_alternate_outlined,
+                        color: theme.primaryIconColor,
+                      ),
+                      tooltip: 'Add Media',
+                      onPressed: () => _openMediaPicker(context),
+                    ),
 
                   // Freehand Drawing Mode
                   if (widget.config.enableDrawing)
@@ -357,6 +407,20 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
                       ),
                       tooltip: strings.togglePageStrip,
                       onPressed: _controller.togglePageStrip,
+                    ),
+
+                  // Toggle Timeline
+                  if (widget.config.enableTimeline)
+                    IconButton(
+                      icon: Icon(
+                        Icons.movie_filter_outlined,
+                        color:
+                            _controller.state.showTimeline
+                                ? theme.accentColor
+                                : theme.secondaryIconColor,
+                      ),
+                      tooltip: strings.timeline,
+                      onPressed: _controller.toggleTimeline,
                     ),
 
                   // Save Draft
@@ -449,6 +513,119 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
       backgroundColor: Colors.transparent,
       builder: (_) => LayerManagerSheet(controller: _controller),
     );
+  }
+
+  void _openAnimationSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AnimationPickerSheet(controller: _controller),
+    );
+  }
+
+  void _openAudioSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AudioSettingsSheet(controller: _controller),
+    );
+  }
+
+  void _openCoverSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CoverPickerSheet(controller: _controller),
+    );
+  }
+
+  void _openMediaPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: widget.config.theme.sheetBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library,
+                    color: Colors.blueAccent,
+                  ),
+                  title: const Text(
+                    'Add Photo from Gallery',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    final asset =
+                        await widget.config.mediaPickerAdapter?.pickImage();
+                    if (asset != null) {
+                      _insertMediaAsset(asset);
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.video_library,
+                    color: Colors.purpleAccent,
+                  ),
+                  title: const Text(
+                    'Add Video from Gallery',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    final asset =
+                        await widget.config.mediaPickerAdapter?.pickVideo();
+                    if (asset != null) {
+                      _insertMediaAsset(asset);
+                    }
+                  },
+                ),
+                if (widget.config.captureAdapter != null) ...[
+                  ListTile(
+                    leading: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.greenAccent,
+                    ),
+                    title: const Text(
+                      'Take Photo',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () async {
+                      Navigator.of(ctx).pop();
+                      final asset =
+                          await widget.config.captureAdapter!.capturePhoto();
+                      if (asset != null) {
+                        _insertMediaAsset(asset);
+                      }
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _insertMediaAsset(StoryMediaAsset asset) {
+    if (_controller.activePage.backgroundAsset == null) {
+      _controller.setPageBackground(asset: asset);
+    } else {
+      _controller.addMediaPage(asset);
+    }
   }
 
   void _handleAdjustPress(BuildContext context) {
@@ -627,11 +804,29 @@ class _StoryKitEditorState extends State<StoryKitEditor> {
   }
 
   Future<void> _handleExport() async {
-    setState(() => _isExporting = true);
+    setState(() {
+      _isExporting = true;
+      _exportProgressMsg = widget.config.strings.exportingStory;
+    });
     try {
-      const exporter = StoryStillImageExporter();
-      final results = await exporter.exportProject(_controller.project);
-      widget.onExport?.call(results);
+      if (widget.onExportProject != null) {
+        final exporter = StoryProjectExporter();
+        final result = await exporter.exportProject(
+          project: _controller.project,
+          onProgress: (idx, total, prog, msg) {
+            if (mounted) {
+              setState(() {
+                _exportProgressMsg = msg;
+              });
+            }
+          },
+        );
+        widget.onExportProject!(result);
+      } else {
+        const exporter = StoryStillImageExporter();
+        final results = await exporter.exportProject(_controller.project);
+        widget.onExport?.call(results);
+      }
     } finally {
       if (mounted) {
         setState(() => _isExporting = false);

@@ -277,6 +277,47 @@ class DuplicatePageCommand extends EditorCommand {
   }
 }
 
+/// Reorders a page from [oldIndex] to [newIndex] within the project.
+class ReorderPageCommand extends EditorCommand {
+  const ReorderPageCommand({required this.oldIndex, required this.newIndex});
+
+  final int oldIndex;
+  final int newIndex;
+
+  @override
+  String get description => 'Reorder Page';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    if (oldIndex < 0 ||
+        oldIndex >= project.pages.length ||
+        newIndex < 0 ||
+        newIndex >= project.pages.length ||
+        oldIndex == newIndex) {
+      return project;
+    }
+    final pages = List<StoryPage>.from(project.pages);
+    final page = pages.removeAt(oldIndex);
+    pages.insert(newIndex, page);
+    return project.copyWith(pages: pages);
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    if (oldIndex < 0 ||
+        oldIndex >= project.pages.length ||
+        newIndex < 0 ||
+        newIndex >= project.pages.length ||
+        oldIndex == newIndex) {
+      return project;
+    }
+    final pages = List<StoryPage>.from(project.pages);
+    final page = pages.removeAt(newIndex);
+    pages.insert(oldIndex, page);
+    return project.copyWith(pages: pages);
+  }
+}
+
 /// Changes the background color or media asset of a page.
 class SetPageBackgroundCommand extends EditorCommand {
   const SetPageBackgroundCommand({
@@ -589,6 +630,42 @@ class UpdateImageAdjustmentsCommand extends EditorCommand {
   }
 }
 
+/// Updates background image adjustments for an entire page with undo/redo support.
+class UpdatePageImageAdjustmentsCommand extends EditorCommand {
+  const UpdatePageImageAdjustmentsCommand({
+    required this.pageId,
+    required this.previousAdjustments,
+    required this.newAdjustments,
+  });
+
+  final String pageId;
+  final ImageAdjustments? previousAdjustments;
+  final ImageAdjustments? newAdjustments;
+
+  @override
+  String get description => 'Update page image adjustments';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        imageAdjustments: newAdjustments,
+        clearImageAdjustments: newAdjustments == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        imageAdjustments: previousAdjustments,
+        clearImageAdjustments: previousAdjustments == null,
+      );
+    });
+  }
+}
+
 /// Applies a preset template to the active page, saving prior page state for undo.
 class ApplyTemplateCommand extends EditorCommand {
   const ApplyTemplateCommand({
@@ -610,6 +687,251 @@ class ApplyTemplateCommand extends EditorCommand {
   @override
   StoryProject undo(StoryProject project) {
     return _modifyPage(project, templatedPage.id, (page) => previousPage);
+  }
+}
+
+/// Updates the background video trim boundaries on a page.
+class SetPageVideoTrimRangeCommand extends EditorCommand {
+  const SetPageVideoTrimRangeCommand({
+    required this.pageId,
+    required this.newTrimRange,
+    required this.previousTrimRange,
+  });
+
+  final String pageId;
+  final VideoTrimRange? newTrimRange;
+  final VideoTrimRange? previousTrimRange;
+
+  @override
+  String get description => 'Trim video';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        videoTrimRange: newTrimRange,
+        clearVideoTrimRange: newTrimRange == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        videoTrimRange: previousTrimRange,
+        clearVideoTrimRange: previousTrimRange == null,
+      );
+    });
+  }
+}
+
+/// Updates audio policy (muting, volume, soundtrack) on a page.
+class SetPageAudioPolicyCommand extends EditorCommand {
+  const SetPageAudioPolicyCommand({
+    required this.pageId,
+    required this.newAudioPolicy,
+    required this.previousAudioPolicy,
+  });
+
+  final String pageId;
+  final VideoAudioPolicy? newAudioPolicy;
+  final VideoAudioPolicy? previousAudioPolicy;
+
+  @override
+  String get description => 'Update audio settings';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        audioPolicy: newAudioPolicy,
+        clearAudioPolicy: newAudioPolicy == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        audioPolicy: previousAudioPolicy,
+        clearAudioPolicy: previousAudioPolicy == null,
+      );
+    });
+  }
+}
+
+/// Updates the cover thumbnail timestamp on a page.
+class SetPageCoverTimestampCommand extends EditorCommand {
+  const SetPageCoverTimestampCommand({
+    required this.pageId,
+    required this.newCoverTimestamp,
+    required this.previousCoverTimestamp,
+  });
+
+  final String pageId;
+  final Duration? newCoverTimestamp;
+  final Duration? previousCoverTimestamp;
+
+  @override
+  String get description => 'Set cover frame';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        coverTimestamp: newCoverTimestamp,
+        clearCoverTimestamp: newCoverTimestamp == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyPage(project, pageId, (page) {
+      return page.copyWith(
+        coverTimestamp: previousCoverTimestamp,
+        clearCoverTimestamp: previousCoverTimestamp == null,
+      );
+    });
+  }
+}
+
+/// Updates the time-bounded visibility range for a specific layer.
+class SetElementTimeRangeCommand extends EditorCommand {
+  const SetElementTimeRangeCommand({
+    required this.pageId,
+    required this.elementId,
+    required this.newTimeRange,
+    required this.previousTimeRange,
+  });
+
+  final String pageId;
+  final String elementId;
+  final LayerTimeRange? newTimeRange;
+  final LayerTimeRange? previousTimeRange;
+
+  @override
+  String get description => 'Set layer time range';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(
+        visibleTimeRange: newTimeRange,
+        clearVisibleTimeRange: newTimeRange == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(
+        visibleTimeRange: previousTimeRange,
+        clearVisibleTimeRange: previousTimeRange == null,
+      );
+    });
+  }
+}
+
+/// Updates the entrance/exit animation configuration for a specific layer.
+class SetElementAnimationCommand extends EditorCommand {
+  const SetElementAnimationCommand({
+    required this.pageId,
+    required this.elementId,
+    required this.newAnimation,
+    required this.previousAnimation,
+  });
+
+  final String pageId;
+  final String elementId;
+  final OverlayAnimationConfig? newAnimation;
+  final OverlayAnimationConfig? previousAnimation;
+
+  @override
+  String get description => 'Set layer animation';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(
+        animation: newAnimation,
+        clearAnimation: newAnimation == null,
+      );
+    });
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    return _modifyElement(project, pageId, elementId, (el) {
+      return el.copyWith(
+        animation: previousAnimation,
+        clearAnimation: previousAnimation == null,
+      );
+    });
+  }
+}
+
+/// Splits a video page into two contiguous pages at [splitTime].
+class SplitPageVideoClipCommand extends EditorCommand {
+  const SplitPageVideoClipCommand({
+    required this.pageId,
+    required this.newPageId,
+    required this.splitTime,
+    required this.previousPage,
+  });
+
+  final String pageId;
+  final String newPageId;
+  final Duration splitTime;
+  final StoryPage previousPage;
+
+  @override
+  String get description => 'Split video clip';
+
+  @override
+  StoryProject execute(StoryProject project) {
+    final originalTrim =
+        previousPage.videoTrimRange ??
+        VideoTrimRange(end: previousPage.duration);
+    final page1 = previousPage.copyWith(
+      duration: splitTime - originalTrim.start,
+      videoTrimRange: VideoTrimRange(start: originalTrim.start, end: splitTime),
+    );
+    final page2 = previousPage.copyWith(
+      id: newPageId,
+      duration: originalTrim.end - splitTime,
+      videoTrimRange: VideoTrimRange(start: splitTime, end: originalTrim.end),
+    );
+
+    final pages = <StoryPage>[];
+    for (final p in project.pages) {
+      if (p.id == pageId) {
+        pages.add(page1);
+        pages.add(page2);
+      } else {
+        pages.add(p);
+      }
+    }
+    return project.copyWith(pages: pages);
+  }
+
+  @override
+  StoryProject undo(StoryProject project) {
+    final pages = <StoryPage>[];
+    for (final p in project.pages) {
+      if (p.id == pageId) {
+        pages.add(previousPage);
+      } else if (p.id == newPageId) {
+        // Drop the second split page
+        continue;
+      } else {
+        pages.add(p);
+      }
+    }
+    return project.copyWith(pages: pages);
   }
 }
 

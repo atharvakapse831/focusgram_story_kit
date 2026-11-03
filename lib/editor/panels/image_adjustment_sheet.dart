@@ -23,17 +23,30 @@ class _ImageAdjustmentSheetState extends State<ImageAdjustmentSheet> {
   @override
   void initState() {
     super.initState();
-    final el = widget.controller.activePage.getElement(widget.elementId);
-    if (el != null && el.payload is ImageElementPayload) {
-      _current = (el.payload as ImageElementPayload).adjustments;
+    if (widget.elementId == 'background') {
+      _current =
+          widget.controller.activePage.imageAdjustments ??
+          ImageAdjustments.identity;
     } else {
-      _current = ImageAdjustments.identity;
+      final el = widget.controller.activePage.getElement(widget.elementId);
+      if (el != null && el.payload is ImageElementPayload) {
+        _current = (el.payload as ImageElementPayload).adjustments;
+      } else {
+        _current = ImageAdjustments.identity;
+      }
     }
   }
 
   void _apply(ImageAdjustments newAdjustments) {
     setState(() => _current = newAdjustments);
-    widget.controller.updateImageAdjustments(widget.elementId, newAdjustments);
+    if (widget.elementId == 'background') {
+      widget.controller.updatePageImageAdjustments(newAdjustments);
+    } else {
+      widget.controller.updateImageAdjustments(
+        widget.elementId,
+        newAdjustments,
+      );
+    }
   }
 
   @override

@@ -18,6 +18,7 @@ class StoryPageStrip extends StatelessWidget {
       builder: (context, _) {
         final pages = controller.project.pages;
         final activePageId = controller.state.activePageId;
+        final activeIndex = pages.indexWhere((p) => p.id == activePageId);
 
         return Container(
           height: 100,
@@ -25,21 +26,34 @@ class StoryPageStrip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              // Scrollable thumbnails
+              // Reorderable thumbnails
               Expanded(
-                child: ListView.separated(
+                child: ReorderableListView.builder(
                   scrollDirection: Axis.horizontal,
+                  buildDefaultDragHandles: false,
                   itemCount: pages.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  // ignore: deprecated_member_use
+                  onReorder: (oldIndex, newIndex) {
+                    final target =
+                        newIndex > oldIndex ? newIndex - 1 : newIndex;
+                    controller.reorderPage(oldIndex, target);
+                  },
                   itemBuilder: (context, index) {
                     final page = pages[index];
                     final isSelected = page.id == activePageId;
 
-                    return _buildPageThumbnail(
-                      context,
-                      page: page,
+                    return ReorderableDragStartListener(
+                      key: ValueKey(page.id),
                       index: index,
-                      isSelected: isSelected,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: _buildPageThumbnail(
+                          context,
+                          page: page,
+                          index: index,
+                          isSelected: isSelected,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -53,6 +67,43 @@ class StoryPageStrip extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Move left button
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 16,
+                      color: activeIndex > 0 ? Colors.white : Colors.white24,
+                    ),
+                    tooltip: 'Move Left',
+                    onPressed:
+                        activeIndex > 0
+                            ? () => controller.reorderPage(
+                              activeIndex,
+                              activeIndex - 1,
+                            )
+                            : null,
+                  ),
+
+                  // Move right button
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color:
+                          activeIndex >= 0 && activeIndex < pages.length - 1
+                              ? Colors.white
+                              : Colors.white24,
+                    ),
+                    tooltip: 'Move Right',
+                    onPressed:
+                        activeIndex >= 0 && activeIndex < pages.length - 1
+                            ? () => controller.reorderPage(
+                              activeIndex,
+                              activeIndex + 1,
+                            )
+                            : null,
+                  ),
+
                   // Add Page button
                   IconButton(
                     icon: const Icon(Icons.add_to_photos, color: Colors.white),
