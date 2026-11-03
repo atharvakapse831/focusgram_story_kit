@@ -3,8 +3,8 @@
 **Status:** Acceptance Verification Matrix  
 **Repository:** `atharvakapse831/focusgram_story_kit`  
 **Branch:** `main`  
-**Commit:** `e65140a`  
-**Date:** 2026-11-02  
+**Commit:** `61004b576b383c615b05cb9828ad1e4e61ea4c15`  
+**Date:** 2026-11-03  
 
 ---
 
@@ -28,7 +28,8 @@
 | | **Video Clip Splitting (P0)** | **VERIFIED** | Contiguous segment preservation `[start, splitTime]` and `[splitTime, end]` verified in `test/photo_story_creation_test.dart` and Mobile tests. Timeline synchronization and undo/redo verified. |
 | | Playback speed control (0.5x to 2.0x) | **VERIFIED** | Verified in native Media3 and AVFoundation pipelines. |
 | | Animated overlay compositing | **VERIFIED** | Native `TimestampOverlayRenderer` (Android) and `AVVideoCompositionCoreAnimationTool` (iOS) composite animated text, stickers, and shapes into MP4 video frames. |
-| | P0 Cancellation State Machine | **VERIFIED** | Explicit native termination acknowledgement barrier; zero temp file leaks on cancel. |
+| | P0 Cancellation State Machine | **VERIFIED** | Explicit native termination acknowledgement barrier; zero temp file leaks on cancel. Idempotent repeated cancel calls verified in `test/phase5_native_compositing_and_blockers_test.dart`. |
+| | Concurrent Export Conflict Gating | **VERIFIED** | Rejects conflicting duplicate jobs with identical jobId on Android (`activeJobs.containsKey`) and iOS (`activeSessions[jobId]`). |
 | | Multi-track audio & music mixing | **VERIFIED** | PCM audio mixing with configurable volume balance. |
 | **Mixed-Media Stories** | Multi-page story project strip | **VERIFIED** | Reorderable list view with drag-and-drop and accessible buttons. |
 | | Mixed photo and video slides | **VERIFIED** | Verified in `test/mixed_media_studio_test.dart`. |
@@ -41,11 +42,14 @@
 ## 2. Test Execution Summary
 
 ### FocusGram Story Kit Package (`focusgram_story_kit` on `main`):
-- **Total Automated Tests Executed:** 143 tests
-- **Passed:** 143 (100%)
+- **Total Automated Tests Executed:** 144 tests
+- **Passed:** 144 (100%)
 - **Failed:** 0
 - **Static Analysis Issues:** 0 warnings / 0 errors (`dart analyze`)
-- **Code Formatting:** 100% formatted (`dart format`)
+- **Code Formatting:** 100% formatted (`dart format --output=none --set-exit-if-changed .`)
+- **GitHub Actions CI Runs:**
+  - `main` push: **Run ID `41614668274` — SUCCESS**
+  - `phase-5/video-and-animation` PR: **Run ID `41614698146` — SUCCESS**
 
 ### FocusGram Mobile (`Code-Plus-Academy/Mobile` on `feat/story-kit-android-video-integration`):
 - **Total Automated Story Tests Executed:** 27 tests (`test/feature/stories/`)
