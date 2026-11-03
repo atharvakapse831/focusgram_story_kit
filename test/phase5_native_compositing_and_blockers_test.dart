@@ -399,14 +399,13 @@ void main() {
         final job = exporter.startExport(project: project);
 
         // Call cancel multiple times in rapid succession
-        await Future.wait([
-          job.cancel(),
-          job.cancel(),
-          job.cancel(),
-        ]);
+        await Future.wait([job.cancel(), job.cancel(), job.cancel()]);
 
         expect(job.isCancelled, isTrue);
-        expect(cancelCallCount, equals(1)); // onCancel handler invoked exactly once
+        expect(
+          cancelCallCount,
+          equals(1),
+        ); // onCancel handler invoked exactly once
         expect(
           () => job.result,
           throwsA(
